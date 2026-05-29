@@ -1,0 +1,10 @@
+{
+  "name": "Remix: PITHI",
+  "description": "A comprehensive ceremony management platform connecting organizers, owners, and vendors for seamless event planning.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

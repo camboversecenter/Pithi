@@ -1,0 +1,7 @@
+name = "pithi"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+[vars]
+# Add your environment variables here or in the Cloudflare dashboard
+# API_KEY = "your_api_key"

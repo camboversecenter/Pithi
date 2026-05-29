@@ -1,0 +1,164 @@
+
+import React, { useState } from 'react';
+import { Ceremony, Transaction, ReportedTransaction } from '../../types';
+import { addTransaction, deleteTransaction, confirmReportedTransaction, rejectReportedTransaction } from '../../services/dataService';
+import { Card, Button, Modal, Input, Select } from '../UIComponents';
+import { Plus, AlertCircle, Eye, Check, X, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
+import { useGlobalDialog } from '../../contexts/GlobalDialogContext';
+
+interface OwnerBudgetProps {
+    ceremony: Ceremony;
+    transactions: Transaction[];
+    pendingReports: ReportedTransaction[];
+    onRefresh: () => void;
+}
+
+const OwnerBudget: React.FC<OwnerBudgetProps> = ({ ceremony, transactions, pendingReports, onRefresh }) => {
+    const { showAlert, showConfirm } = useGlobalDialog();
+    const [isTxModalOpen, setIsTxModalOpen] = useState(false);
+    // 1. Set type = INCOME (Revenue) and category = Gift as default
+    const [newTx, setNewTx] = useState({ description: '', amount: '', type: 'INCOME', category: 'Gift' });
+
+    // Computed
+    const income = transactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
+    const expense = transactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount, 0);
+    const balance = income - expense;
+
+    const handleConfirmReport = async (report: ReportedTransaction) => {
+        await confirmReportedTransaction(report.id);
+        onRefresh();
+        await showAlert("ជោគជ័យ", "បានទទួល និងកត់ត្រាចូលបញ្ជីថវិកា។", "success");
+    };
+
+    const handleRejectReport = async (report: ReportedTransaction) => {
+        const confirm = await showConfirm("បដិសេធ?", "តើអ្នកចង់លុបសំណើនេះមែនទេ?", "danger");
+        if (confirm) {
+            await rejectReportedTransaction(report.id);
+            onRefresh();
+        }
+    };
+
+    const handleAddTx = async () => {
+        if(!newTx.amount) return;
+        await addTransaction({
+            ceremonyId: ceremony.id, 
+            amount: Number(newTx.amount), 
+            type: newTx.type as any, 
+            category: newTx.category, 
+            date: new Date().toISOString(), 
+            expenseName: newTx.description
+        });
+        setIsTxModalOpen(false);
+        // Reset to defaults
+        setNewTx({ description: '', amount: '', type: 'INCOME', category: 'Gift' });
+        onRefresh();
+    };
+
+    const handleDeleteTx = async (id: string) => {
+        await deleteTransaction(id);
+        onRefresh();
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in-up">
+            {/* Summary Cards - Forced 3 Columns */}
+            <div className="grid grid-cols-3 gap-3 md:gap-4">
+                <div className="bg-red-50 p-3 md:p-4 rounded-xl border border-red-100 text-red-700">
+                    <p className="text-[10px] md:text-xs font-bold uppercase mb-1">ចំណាយ (Exp)</p>
+                    <p className="text-lg md:text-2xl font-bold font-serif">${expense}</p>
+                </div>
+                <div className="bg-emerald-50 p-3 md:p-4 rounded-xl border border-emerald-100 text-emerald-700">
+                    <p className="text-[10px] md:text-xs font-bold uppercase mb-1">ចំណូល (Rev)</p>
+                    <p className="text-lg md:text-2xl font-bold font-serif">${income}</p>
+                </div>
+                <div className={`p-3 md:p-4 rounded-xl border ${balance >= 0 ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-orange-50 border-orange-100 text-orange-700'}`}>
+                    <p className="text-[10px] md:text-xs font-bold uppercase mb-1">សមតុល្យ (Bal)</p>
+                    <p className="text-lg md:text-2xl font-bold font-serif">${balance}</p>
+                </div>
+            </div>
+
+            {/* Pending Transfers Section */}
+            {pendingReports.length > 0 && (
+                <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 space-y-4">
+                    <h4 className="font-bold text-rose-800 flex items-center">
+                        <AlertCircle size={20} className="mr-2"/> សំណើផ្ទេរប្រាក់ដែលរង់ចាំការបញ្ជាក់ ({pendingReports.length})
+                    </h4>
+                    <div className="grid gap-3">
+                        {pendingReports.map(report => (
+                            <div key={report.id} className="bg-white p-4 rounded-xl border border-rose-100 shadow-sm flex flex-col md:flex-row items-center gap-4">
+                                {/* Thumbnail */}
+                                <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 cursor-pointer flex-shrink-0 relative group" onClick={() => window.open(report.receiptImageUrl, '_blank')}>
+                                    <img src={report.receiptImageUrl} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                        <Eye size={16} className="text-white opacity-0 group-hover:opacity-100"/>
+                                    </div>
+                                </div>
+                                
+                                {/* Details */}
+                                <div className="flex-1 text-center md:text-left">
+                                    <p className="font-bold text-slate-800">{report.guestName}</p>
+                                    <p className="text-sm text-slate-500">បានផ្ទេរ: <span className="font-bold text-rose-600">{report.amount} {report.currency}</span></p>
+                                    <p className="text-xs text-slate-400">{new Date(report.date).toLocaleDateString('km-KH')}</p>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-2">
+                                    <Button onClick={() => handleConfirmReport(report)} className="bg-emerald-600 hover:bg-emerald-700 border-transparent text-white shadow-none h-9 px-3 py-1.5 text-xs h-auto">
+                                        <Check size={16} className="mr-1"/> ទទួល
+                                    </Button>
+                                    <Button variant="secondary" onClick={() => handleRejectReport(report)} className="text-red-600 hover:bg-red-50 border-red-200 shadow-none h-9 px-3 py-1.5 text-xs h-auto">
+                                        <X size={16} className="mr-1"/> បដិសេធ
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <Card title="ប្រតិបត្តិការហិរញ្ញវត្ថុ" action={<Button onClick={() => setIsTxModalOpen(true)}><Plus size={18} className="mr-2"/> បន្ថែម</Button>}>
+                <div className="space-y-3">
+                    {transactions.length > 0 ? transactions.map(t => (
+                        <div key={t.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-full ${t.type === 'INCOME' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                    {t.type === 'INCOME' ? <TrendingUp size={16}/> : <TrendingDown size={16}/>}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-800 text-sm">{t.expenseName || t.donorName || 'ប្រតិបត្តិការ'}</p>
+                                    <p className="text-xs text-slate-500">{t.category} • {new Date(t.date).toLocaleDateString('km-KH')}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className={`font-bold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {t.type === 'INCOME' ? '+' : '-'}${t.amount}
+                                </span>
+                                <button onClick={() => handleDeleteTx(t.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                            </div>
+                        </div>
+                    )) : (
+                        <div className="text-center py-8 text-slate-400">មិនទាន់មានប្រតិបត្តិការ។</div>
+                    )}
+                </div>
+            </Card>
+
+            <Modal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} title="បន្ថែមប្រតិបត្តិការ">
+                <div className="space-y-4">
+                    <div className="flex gap-4">
+                        <div className="flex-1">
+                            <Select label="ប្រភេទ" options={[{value: 'INCOME', label: 'ចំណូល (Revenue)'}, {value: 'EXPENSE', label: 'ចំណាយ (Expense)'}]} value={newTx.type} onChange={e => setNewTx({...newTx, type: e.target.value})} />
+                        </div>
+                            <div className="flex-1">
+                            <Input label="ចំនួនទឹកប្រាក់ ($)" type="number" value={newTx.amount} onChange={e => setNewTx({...newTx, amount: e.target.value})} required />
+                        </div>
+                    </div>
+                    <Input label="បរិយាយ / ឈ្មោះ" value={newTx.description} onChange={e => setNewTx({...newTx, description: e.target.value})} placeholder="ឧ. ទិញភេសជ្ជៈ ឬ ចំណងដៃ សុខ" required />
+                    <Select label="ប្រភេទចំណាយ/ចំណូល" options={[{value: 'Gift', label: 'Gift/ចំណងដៃ'}, {value: 'General', label: 'General'}, {value: 'Food', label: 'Food'}, {value: 'Decoration', label: 'Decoration'}]} value={newTx.category} onChange={e => setNewTx({...newTx, category: e.target.value})} />
+                    <Button className="w-full" onClick={handleAddTx}>បន្ថែម</Button>
+                </div>
+            </Modal>
+        </div>
+    );
+};
+
+export default OwnerBudget;

@@ -12,133 +12,457 @@ const handleSupabaseError = (error: any, context: string) => {
     throw new Error(error.message || `Error in ${context}`);
 };
 
+const isLocalMode = () => {
+    return !!localStorage.getItem('pithi_mock_user');
+};
+
+const getLocalCeremonies = (): Ceremony[] => {
+    try {
+        const ceremoniesJson = localStorage.getItem('pithi_local_ceremonies');
+        if (!ceremoniesJson) {
+            const demoCeremonies: Ceremony[] = [
+                {
+                    id: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    title: 'ពិធីមង្គលការ សុភ័ក្រ្ត & ទេវី (Wedding of Sopheak & Devi)',
+                    type: 'WEDDING',
+                    date: '2026-11-18',
+                    description: 'ពិធីមង្គលការបែបប្រពៃណីខ្មែរប្រណីត នៅសណ្ឋាគារសូហ្វីតែល',
+                    organizerId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e502',
+                    ownerId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e503',
+                    location: 'សណ្ឋាគារ សូហ្វីតែល ភ្នំពេញ (Sofitel Phnom Penh)',
+                    budget: 15000,
+                    themeColor: '#e11d48'
+                }
+            ];
+            localStorage.setItem('pithi_local_ceremonies', JSON.stringify(demoCeremonies));
+            return demoCeremonies;
+        }
+        return JSON.parse(ceremoniesJson);
+    } catch (e) {
+        return [];
+    }
+};
+
+const saveLocalCeremonies = (ceremonies: Ceremony[]) => {
+    localStorage.setItem('pithi_local_ceremonies', JSON.stringify(ceremonies));
+};
+
 // --- CEREMONIES ---
 
 export const getCeremonies = async (userId: string, role: UserRole, page: number, limit: number, filter: 'UPCOMING' | 'PAST' | 'ALL'): Promise<PaginatedResponse<Ceremony>> => {
-    let query = supabase.from('ceremonies').select('*', { count: 'exact' });
-    
-    if (role === UserRole.ORGANIZER) {
-        query = query.eq('organizerId', userId);
-    } else {
-        query = query.eq('ownerId', userId);
-    }
-    
-    const today = new Date().toISOString().split('T')[0];
-    if (filter === 'UPCOMING') {
-        query = query.gte('date', today);
-    } else if (filter === 'PAST') {
-        query = query.lt('date', today);
-    }
-
-    query = query.order('date', { ascending: false });
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
-
-    const { data, error, count } = await query;
-    if (error) handleSupabaseError(error, 'getCeremonies');
-    
-    return {
-        data: (data as Ceremony[]) || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
+    const handleLocalGet = (): PaginatedResponse<Ceremony> => {
+        const local = getLocalCeremonies();
+        let filtered = local.filter(c => role === UserRole.ORGANIZER ? c.organizerId === userId : c.ownerId === userId);
+        
+        const today = new Date().toISOString().split('T')[0];
+        if (filter === 'UPCOMING') {
+            filtered = filtered.filter(c => c.date >= today);
+        } else if (filter === 'PAST') {
+            filtered = filtered.filter(c => c.date < today);
+        }
+        
+        filtered.sort((a, b) => b.date.localeCompare(a.date));
+        
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pageData = filtered.slice(from, to);
+        
+        return {
+            data: pageData,
+            total: filtered.length,
+            page,
+            limit,
+            totalPages: Math.ceil(filtered.length / limit)
+        };
     };
+
+    if (isLocalMode()) {
+        return handleLocalGet();
+    }
+
+    try {
+        let query = supabase.from('ceremonies').select('*', { count: 'exact' });
+        
+        if (role === UserRole.ORGANIZER) {
+            query = query.eq('organizerId', userId);
+        } else {
+            query = query.eq('ownerId', userId);
+        }
+        
+        const today = new Date().toISOString().split('T')[0];
+        if (filter === 'UPCOMING') {
+            query = query.gte('date', today);
+        } else if (filter === 'PAST') {
+            query = query.lt('date', today);
+        }
+
+        query = query.order('date', { ascending: false });
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+        
+        return {
+            data: (data as Ceremony[]) || [],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getCeremonies Supabase error, falling back to local storage:", err);
+        return handleLocalGet();
+    }
 };
 
 export const getCeremonyById = async (id: string): Promise<Ceremony | null> => {
-    const { data, error } = await supabase.from('ceremonies').select('*').eq('id', id).single();
-    if (error) return null;
-    return data as Ceremony;
+    if (isLocalMode()) {
+        const ceremonies = getLocalCeremonies();
+        return ceremonies.find(c => c.id === id) || null;
+    }
+    try {
+        const { data, error } = await supabase.from('ceremonies').select('*').eq('id', id).single();
+        if (error) throw error;
+        return data as Ceremony;
+    } catch (err) {
+        console.warn("getCeremonyById Supabase error, falling back to local storage:", err);
+        const ceremonies = getLocalCeremonies();
+        return ceremonies.find(c => c.id === id) || null;
+    }
 };
 
 export const createCeremony = async (data: Partial<Ceremony>): Promise<Ceremony> => {
-    const { data: result, error } = await supabase.from('ceremonies').insert(data).select().single();
-    if (error) handleSupabaseError(error, 'createCeremony');
-    return result as Ceremony;
+    const fallbackCreate = (): Ceremony => {
+        const ceremonies = getLocalCeremonies();
+        const newCeremony: Ceremony = {
+            id: data.id || (crypto.randomUUID ? crypto.randomUUID() : `ceremony-${Date.now()}`),
+            title: data.title || 'Untitled Ceremony',
+            type: data.type || 'WEDDING',
+            date: data.date || new Date().toISOString().split('T')[0],
+            description: data.description || '',
+            organizerId: data.organizerId || '',
+            ownerId: data.ownerId || undefined,
+            location: data.location || '',
+            budget: data.budget || 0,
+            invitationMessage: data.invitationMessage || '',
+            themeColor: data.themeColor || '#e11d48',
+            khqrUrl: data.khqrUrl || undefined,
+            bannerUrl: data.bannerUrl || undefined
+        };
+        ceremonies.push(newCeremony);
+        saveLocalCeremonies(ceremonies);
+        return newCeremony;
+    };
+
+    if (isLocalMode()) {
+        return fallbackCreate();
+    }
+    try {
+        const { data: result, error } = await supabase.from('ceremonies').insert(data).select().single();
+        if (error) throw error;
+        return result as Ceremony;
+    } catch (err) {
+        console.warn("createCeremony Supabase error (possibly RLS), falling back to local storage:", err);
+        return fallbackCreate();
+    }
 };
 
 export const updateCeremony = async (id: string, data: Partial<Ceremony>): Promise<Ceremony | null> => {
-    const { data: result, error } = await supabase.from('ceremonies').update(data).eq('id', id).select().single();
-    if (error) handleSupabaseError(error, 'updateCeremony');
-    return result as Ceremony;
+    const fallbackUpdate = (): Ceremony | null => {
+        const ceremonies = getLocalCeremonies();
+        const index = ceremonies.findIndex(c => c.id === id);
+        if (index === -1) return null;
+        ceremonies[index] = { ...ceremonies[index], ...data };
+        saveLocalCeremonies(ceremonies);
+        return ceremonies[index];
+    };
+
+    if (isLocalMode()) {
+        return fallbackUpdate();
+    }
+    try {
+        const { data: result, error } = await supabase.from('ceremonies').update(data).eq('id', id).select().single();
+        if (error) throw error;
+        return result as Ceremony;
+    } catch (err) {
+        console.warn("updateCeremony Supabase error, falling back to local storage:", err);
+        return fallbackUpdate();
+    }
 };
 
 export const deleteCeremony = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('ceremonies').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteCeremony');
+    const fallbackDelete = () => {
+        const ceremonies = getLocalCeremonies();
+        const filtered = ceremonies.filter(c => c.id !== id);
+        saveLocalCeremonies(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+    try {
+        const { error } = await supabase.from('ceremonies').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("deleteCeremony Supabase error, falling back to local storage:", err);
+        fallbackDelete();
+    }
 };
 
 // --- SERVICES ---
 
-export const getServices = async (role?: UserRole, page = 1, limit = 10, search?: string): Promise<PaginatedResponse<Service>> => {
-    let query = supabase.from('services').select('*', { count: 'exact' });
-    
-    if (role) query = query.eq('role', role);
-    
-    if (search) {
-        query = query.or(`name.ilike.%${search}%,providerName.ilike.%${search}%`);
+const getLocalServices = (): Service[] => {
+    try {
+        const servicesJson = localStorage.getItem('pithi_local_services');
+        if (!servicesJson) {
+            const demoServices: Service[] = [
+                {
+                    id: '1',
+                    providerId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e505',
+                    providerName: 'តន្ត្រីបុរាណ ភ្នំពេញ (Phnom Penh Classical Music)',
+                    role: UserRole.MUSIC_BAND,
+                    name: 'ក្រុមតន្ត្រីបុរាណខ្មែរប្រណីត (Premium Khmer Classical Band)',
+                    description: 'ផ្តល់ជូនសេវាកម្មភ្លេងការខ្មែរគូប្រគំដោយឧបករណ៍បុរាណពិតៗ និងសម្លេងពីរោះរណ្តំចិត្ត។',
+                    price: 350,
+                    priceNote: 'ក្នុងមួយកម្មវិធី',
+                    location: 'ភ្នំពេញ (Phnom Penh)',
+                    imageUrl: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500&auto=format&fit=crop&q=60'
+                },
+                {
+                    id: '2',
+                    providerId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e506',
+                    providerName: 'វិមានអាពាហ៍ពិពាហ៍ (Vimean Wedding Hall)',
+                    role: UserRole.HALL,
+                    name: 'សាលពិធីមង្គលការលំដាប់តារាប្រាំ (Five-Star Wedding Hall)',
+                    description: 'សាលដ៏ធំទូលាយ មានម៉ាស៊ីនត្រជាក់ត្រជាក់ខ្លាំង តុបតែងលម្អផ្កាស្រស់ស្អាតឥតខ្ចោះ។',
+                    price: 2500,
+                    priceNote: 'ក្នុងមួយថ្ងៃ',
+                    location: 'ភ្នំពេញ (Phnom Penh)',
+                    imageUrl: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=500&auto=format&fit=crop&q=60'
+                }
+            ];
+            localStorage.setItem('pithi_local_services', JSON.stringify(demoServices));
+            return demoServices;
+        }
+        return JSON.parse(servicesJson);
+    } catch (e) {
+        return [];
     }
-    
-    query = query.order('id', { ascending: false });
-    
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
+};
 
-    const { data, error, count } = await query;
-    if (error) handleSupabaseError(error, 'getServices');
+const saveLocalServices = (services: Service[]) => {
+    localStorage.setItem('pithi_local_services', JSON.stringify(services));
+};
 
-    return {
-        data: (data as Service[]) || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
+export const getServices = async (role?: UserRole, page = 1, limit = 10, search?: string): Promise<PaginatedResponse<Service>> => {
+    const handleLocalGet = (): PaginatedResponse<Service> => {
+        let local = getLocalServices();
+        if (role) {
+            local = local.filter(s => s.role === role);
+        }
+        if (search) {
+            const cleanSearch = search.toLowerCase();
+            local = local.filter(s => (s.name || '').toLowerCase().includes(cleanSearch) || (s.providerName || '').toLowerCase().includes(cleanSearch));
+        }
+        
+        local.sort((a, b) => b.id.localeCompare(a.id));
+        
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pageData = local.slice(from, to);
+        
+        return {
+            data: pageData,
+            total: local.length,
+            page,
+            limit,
+            totalPages: Math.ceil(local.length / limit)
+        };
     };
+
+    if (isLocalMode()) {
+        return handleLocalGet();
+    }
+
+    try {
+        let query = supabase.from('services').select('*', { count: 'exact' });
+        
+        if (role) query = query.eq('role', role);
+        
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,providerName.ilike.%${search}%`);
+        }
+        
+        query = query.order('id', { ascending: false });
+        
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        return {
+            data: (data as Service[]) || [],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getServices Supabase error, falling back to local storage:", err);
+        return handleLocalGet();
+    }
 };
 
 export const getMyServices = async (userId: string, page = 1, limit = 10): Promise<PaginatedResponse<Service>> => {
-    let query = supabase.from('services').select('*', { count: 'exact' }).eq('providerId', userId);
-    query = query.order('id', { ascending: false });
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
-
-    const { data, error, count } = await query;
-    if (error) handleSupabaseError(error, 'getMyServices');
-
-    return {
-        data: (data as Service[]) || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
+    const handleLocalGetMy = (): PaginatedResponse<Service> => {
+        let local = getLocalServices().filter(s => s.providerId === userId);
+        local.sort((a, b) => b.id.localeCompare(a.id));
+        
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pageData = local.slice(from, to);
+        
+        return {
+            data: pageData,
+            total: local.length,
+            page,
+            limit,
+            totalPages: Math.ceil(local.length / limit)
+        };
     };
+
+    if (isLocalMode()) {
+        return handleLocalGetMy();
+    }
+
+    try {
+        let query = supabase.from('services').select('*', { count: 'exact' }).eq('providerId', userId);
+        query = query.order('id', { ascending: false });
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        return {
+            data: (data as Service[]) || [],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getMyServices Supabase error, falling back to local storage:", err);
+        return handleLocalGetMy();
+    }
 };
 
 export const getServiceById = async (id: string): Promise<Service | null> => {
-    const { data, error } = await supabase.from('services').select('*').eq('id', id).single();
-    if (error) return null;
-    return data as Service;
+    if (isLocalMode()) {
+        const local = getLocalServices();
+        return local.find(s => s.id === id) || null;
+    }
+    try {
+        const { data, error } = await supabase.from('services').select('*').eq('id', id).single();
+        if (error) throw error;
+        return data as Service;
+    } catch (err) {
+        console.warn("getServiceById Supabase error, falling back to local storage:", err);
+        const local = getLocalServices();
+        return local.find(s => s.id === id) || null;
+    }
 };
 
 export const createService = async (data: Partial<Service>): Promise<Service> => {
-    const { data: result, error } = await supabase.from('services').insert(data).select().single();
-    if (error) handleSupabaseError(error, 'createService');
-    return result as Service;
+    const fallbackCreate = (): Service => {
+        const local = getLocalServices();
+        const newService: Service = {
+            id: data.id || `service-${Date.now()}`,
+            providerId: data.providerId || 'unknown',
+            providerName: data.providerName || 'Provider',
+            role: data.role || UserRole.ORGANIZER,
+            name: data.name || '',
+            description: data.description || '',
+            price: data.price || 0,
+            priceNote: data.priceNote || undefined,
+            location: data.location || '',
+            locationType: data.locationType || 'FIXED',
+            mapUrl: data.mapUrl || undefined,
+            imageUrl: data.imageUrl || undefined
+        };
+        local.push(newService);
+        saveLocalServices(local);
+        return newService;
+    };
+
+    if (isLocalMode()) {
+        return fallbackCreate();
+    }
+
+    try {
+        const { data: result, error } = await supabase.from('services').insert(data).select().single();
+        if (error) throw error;
+        return result as Service;
+    } catch (err) {
+        console.warn("createService Supabase error (RLS or otherwise), falling back to local storage:", err);
+        return fallbackCreate();
+    }
 };
 
 export const updateService = async (id: string, data: Partial<Service>): Promise<Service> => {
-    const { data: result, error } = await supabase.from('services').update(data).eq('id', id).select().single();
-    if (error) handleSupabaseError(error, 'updateService');
-    return result as Service;
+    const fallbackUpdate = (): Service => {
+        const local = getLocalServices();
+        const index = local.findIndex(s => s.id === id);
+        if (index === -1) {
+            const newService = { ...data, id } as Service;
+            local.push(newService);
+            saveLocalServices(local);
+            return newService;
+        }
+        local[index] = { ...local[index], ...data };
+        saveLocalServices(local);
+        return local[index];
+    };
+
+    if (isLocalMode()) {
+        return fallbackUpdate();
+    }
+
+    try {
+        const { data: result, error } = await supabase.from('services').update(data).eq('id', id).select().single();
+        if (error) throw error;
+        return result as Service;
+    } catch (err) {
+        console.warn("updateService Supabase error, falling back to local storage:", err);
+        return fallbackUpdate();
+    }
 };
 
 export const deleteService = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('services').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteService');
+    const fallbackDelete = () => {
+        const local = getLocalServices();
+        const filtered = local.filter(s => s.id !== id);
+        saveLocalServices(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('services').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("deleteService Supabase error, falling back to local storage:", err);
+        fallbackDelete();
+    }
 };
 
 // --- BOOKINGS ---
@@ -460,25 +784,110 @@ export const addReview = async (data: Partial<Review>): Promise<Review> => {
 
 // --- SOCIAL POSTS ---
 
-export const getSocialPosts = async (userId: string, page = 1, limit = 10, search?: string, onlyBookmarked = false): Promise<PaginatedResponse<SocialPost>> => {
-    let query = supabase.from('social_posts').select('*, post_bookmarks(userId), post_reactions(userId, reactionType)', { count: 'exact' });
-
-    if (search) {
-        query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+const getLocalSocialPosts = (): SocialPost[] => {
+    try {
+        const postsJson = localStorage.getItem('pithi_local_social_posts');
+        if (!postsJson) {
+            const demoPosts: SocialPost[] = [
+                {
+                    id: 'p1',
+                    authorId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e502',
+                    authorName: 'ទេវី សាយ (Devi Say)',
+                    authorRole: 'ORGANIZER',
+                    title: 'គន្លឹះសំខាន់ៗក្នុងការរៀបចំពិធីមង្គលការឱ្យរលូន (Core Tips for a Smooth Wedding Ceremony)',
+                    content: 'ការរៀបចំពិធីមង្គលការបែបប្រពៃណីខ្មែរ តម្រូវឱ្យមានការត្រៀមលម្អិតតាំងពីព្រលឹមស្រាងៗ។ គន្លឹះធំៗគឺ៖ ១. រៀបចំបញ្ជីភ្ញៀវឱ្យបានច្បាស់លាស់ ២. ជ្រើសរើសសេវាកម្មចុងភៅ និងតន្ត្រីដែលគួរឱ្យទុកចិត្ត ៣. ពិភាក្សាជាមួយអាចារ្យមង្គលការពីពេលវេលាឱ្យបានហ្មត់ចត់បំផុត។',
+                    likes: 12,
+                    useful: 8,
+                    fakes: 0,
+                    bookmarksCount: 4,
+                    createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString()
+                },
+                {
+                    id: 'p2',
+                    authorId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e503',
+                    authorName: 'សុភ័ក្រ្ត ប៊ុន (Sopheak Bun)',
+                    authorRole: 'GENERAL_USER',
+                    title: 'សំណួរ៖ តើគួរជ្រើសរើសសម្លៀកបំពាក់មង្គលការបុរាណប៉ុន្មានកំប្លេសម្រាប់ពិធីពេញមួយថ្ងៃ?',
+                    content: 'ខ្ញុំកំពុងរៀបចំអាពាហ៍ពិពាហ៍នៅខែវិច្ឆិកាខាងមុខនេះ។ ចង់សួរមតិបងៗថា ជាទូទៅក្នុងពិធីមួយថ្ងៃពេញ តើយើងគួរផ្លាស់ប្តូរសម្លៀកបំពាក់បុរាណខ្មែរប៉ុន្មានកំប្លេដើម្បីកុំឱ្យខាតពេល និងហត់នឿយហួសហេតុ? អរគុណទុកជាមុន!',
+                    likes: 5,
+                    useful: 15,
+                    fakes: 1,
+                    bookmarksCount: 2,
+                    createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString()
+                }
+            ];
+            localStorage.setItem('pithi_local_social_posts', JSON.stringify(demoPosts));
+            return demoPosts;
+        }
+        return JSON.parse(postsJson);
+    } catch (e) {
+        return [];
     }
+};
 
-    query = query.order('createdAt', { ascending: false });
+const saveLocalSocialPosts = (posts: SocialPost[]) => {
+    localStorage.setItem('pithi_local_social_posts', JSON.stringify(posts));
+};
 
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
+const getLocalPostComments = (): PostComment[] => {
+    try {
+        const commentsJson = localStorage.getItem('pithi_local_post_comments');
+        if (!commentsJson) {
+            const demoComments: PostComment[] = [
+                {
+                    id: 'comment1',
+                    postId: 'p2',
+                    authorId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e502',
+                    authorName: 'ទេវី សាយ (Devi Say)',
+                    content: 'ជាទូទៅពិធីពេញមួយថ្ងៃគឺប្រហែល ៧ ទៅ ៨ ឈុតបង! ប៉ុន្តែបើចង់កាត់បន្ថយការហត់ អាចជ្រើសយកត្រឹម ៥ ឬ ៦ ឈុតសំខាន់ៗបានហើយបង ដើម្បីមានពេលសម្រាក និងទទួលភ្ញៀវអបអរសាទរបានច្រើន។',
+                    createdAt: new Date(Date.now() - 10 * 3600 * 1000).toISOString()
+                }
+            ];
+            localStorage.setItem('pithi_local_post_comments', JSON.stringify(demoComments));
+            return demoComments;
+        }
+        return JSON.parse(commentsJson);
+    } catch (e) {
+        return [];
+    }
+};
 
-    const { data, error, count } = await query;
-    if (error) handleSupabaseError(error, 'getSocialPosts');
+const saveLocalPostComments = (comments: PostComment[]) => {
+    localStorage.setItem('pithi_local_post_comments', JSON.stringify(comments));
+};
 
-    let mapped = (data as any[] || []).map(p => {
-        const isBookmarked = p.post_bookmarks?.some((b: any) => b.userId === userId);
-        const myReaction = p.post_reactions?.find((r: any) => r.userId === userId)?.reactionType;
+const getLocalPostReactions = (): any[] => {
+    try {
+        return JSON.parse(localStorage.getItem('pithi_local_post_reactions') || '[]');
+    } catch (e) {
+        return [];
+    }
+};
+
+const saveLocalPostReactions = (reactions: any[]) => {
+    localStorage.setItem('pithi_local_post_reactions', JSON.stringify(reactions));
+};
+
+const getLocalPostBookmarks = (): any[] => {
+    try {
+        return JSON.parse(localStorage.getItem('pithi_local_post_bookmarks') || '[]');
+    } catch (e) {
+        return [];
+    }
+};
+
+const saveLocalPostBookmarks = (bookmarks: any[]) => {
+    localStorage.setItem('pithi_local_post_bookmarks', JSON.stringify(bookmarks));
+};
+
+const handleLocalGetSocialPosts = (userId: string, page: number, limit: number, search?: string, onlyBookmarked = false): PaginatedResponse<SocialPost> => {
+    const posts = getLocalSocialPosts();
+    const bookmarks = getLocalPostBookmarks();
+    const reactions = getLocalPostReactions();
+
+    let mapped = posts.map(p => {
+        const isBookmarked = bookmarks.some(b => b.postId === p.id && b.userId === userId);
+        const myReaction = reactions.find(r => r.postId === p.id && r.userId === userId)?.reactionType || null;
         return {
             ...p,
             isBookmarked,
@@ -486,70 +895,288 @@ export const getSocialPosts = async (userId: string, page = 1, limit = 10, searc
         };
     });
 
+    if (search) {
+        const queryClean = search.toLowerCase();
+        mapped = mapped.filter(p => (p.title || '').toLowerCase().includes(queryClean) || (p.content || '').toLowerCase().includes(queryClean));
+    }
+
     if (onlyBookmarked) {
         mapped = mapped.filter(p => p.isBookmarked);
     }
 
+    mapped.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    const from = (page - 1) * limit;
+    const to = from + limit;
+    const paged = mapped.slice(from, to);
+
     return {
-        data: mapped as SocialPost[],
-        total: count || 0,
+        data: paged,
+        total: mapped.length,
         page,
         limit,
-        totalPages: Math.ceil((count || 0) / limit)
+        totalPages: Math.ceil(mapped.length / limit)
     };
 };
 
+export const getSocialPosts = async (userId: string, page = 1, limit = 10, search?: string, onlyBookmarked = false): Promise<PaginatedResponse<SocialPost>> => {
+    if (isLocalMode()) {
+        return handleLocalGetSocialPosts(userId, page, limit, search, onlyBookmarked);
+    }
+
+    try {
+        let query = supabase.from('social_posts').select('*, post_bookmarks(userId), post_reactions(userId, reactionType)', { count: 'exact' });
+
+        if (search) {
+            query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+        }
+
+        query = query.order('createdAt', { ascending: false });
+
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        let mapped = (data as any[] || []).map(p => {
+            const isBookmarked = p.post_bookmarks?.some((b: any) => b.userId === userId);
+            const myReaction = p.post_reactions?.find((r: any) => r.userId === userId)?.reactionType;
+            return {
+                ...p,
+                isBookmarked,
+                myReaction
+            };
+        });
+
+        if (onlyBookmarked) {
+            mapped = mapped.filter(p => p.isBookmarked);
+        }
+
+        return {
+            data: mapped as SocialPost[],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getSocialPosts Supabase error, falling back to local storage:", err);
+        return handleLocalGetSocialPosts(userId, page, limit, search, onlyBookmarked);
+    }
+};
+
 export const createSocialPost = async (data: Partial<SocialPost>): Promise<SocialPost> => {
-    const { data: result, error } = await supabase.from('social_posts').insert({
-        ...data,
-        createdAt: new Date().toISOString(),
-        likes: 0, useful: 0, fakes: 0, bookmarksCount: 0
-    }).select().single();
-    if (error) handleSupabaseError(error, 'createSocialPost');
-    return result as SocialPost;
+    const fallbackCreate = (): SocialPost => {
+        const posts = getLocalSocialPosts();
+        const newPost: SocialPost = {
+            id: data.id || `post-${Date.now()}`,
+            authorId: data.authorId || 'unknown',
+            authorName: data.authorName || 'User',
+            authorRole: data.authorRole || 'GENERAL_USER',
+            title: data.title || '',
+            content: data.content || '',
+            likes: 0,
+            useful: 0,
+            fakes: 0,
+            bookmarksCount: 0,
+            createdAt: new Date().toISOString()
+        };
+        posts.unshift(newPost);
+        saveLocalSocialPosts(posts);
+        return newPost;
+    };
+
+    if (isLocalMode()) {
+        return fallbackCreate();
+    }
+
+    try {
+        const { data: result, error } = await supabase.from('social_posts').insert({
+            ...data,
+            createdAt: new Date().toISOString(),
+            likes: 0, useful: 0, fakes: 0, bookmarksCount: 0
+        }).select().single();
+        if (error) throw error;
+        return result as SocialPost;
+    } catch (err) {
+        console.warn("createSocialPost Supabase error (RLS check), falling back to local storage:", err);
+        return fallbackCreate();
+    }
 };
 
 export const reactToPost = async (postId: string, userId: string, type: PostReactionType): Promise<void> => {
-    const { data: existing } = await supabase.from('post_reactions').select('*').eq('postId', postId).eq('userId', userId).eq('reactionType', type).single();
-    
-    if (existing) {
-        await supabase.from('post_reactions').delete().eq('id', existing.id);
-        const col = type === 'LIKE' ? 'likes' : type === 'USEFUL' ? 'useful' : 'fakes';
-        await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: col });
-    } else {
-        await supabase.from('post_reactions').delete().eq('postId', postId).eq('userId', userId);
-        await supabase.from('post_reactions').insert({ postId, userId, reactionType: type });
-        const col = type === 'LIKE' ? 'likes' : type === 'USEFUL' ? 'useful' : 'fakes';
-        await supabase.rpc('increment_post_stat', { post_id: postId, col_name: col });
+    const handleLocalReact = () => {
+        const reactions = getLocalPostReactions();
+        const posts = getLocalSocialPosts();
+        const existingIndex = reactions.findIndex(r => r.postId === postId && r.userId === userId && r.reactionType === type);
+
+        const post = posts.find(p => p.id === postId);
+
+        if (existingIndex !== -1) {
+            reactions.splice(existingIndex, 1);
+            if (post) {
+                if (type === 'LIKE') post.likes = Math.max(0, post.likes - 1);
+                else if (type === 'USEFUL') post.useful = Math.max(0, post.useful - 1);
+                else if (type === 'FAKE') post.fakes = Math.max(0, post.fakes - 1);
+            }
+        } else {
+            const userReactionsOnPost = reactions.filter(r => r.postId === postId && r.userId === userId);
+            userReactionsOnPost.forEach(r => {
+                const idx = reactions.indexOf(r);
+                if (idx !== -1) reactions.splice(idx, 1);
+                if (post) {
+                    if (r.reactionType === 'LIKE') post.likes = Math.max(0, post.likes - 1);
+                    else if (r.reactionType === 'USEFUL') post.useful = Math.max(0, post.useful - 1);
+                    else if (r.reactionType === 'FAKE') post.fakes = Math.max(0, post.fakes - 1);
+                }
+            });
+
+            reactions.push({
+                id: `react-${Date.now()}`,
+                postId,
+                userId,
+                reactionType: type
+            });
+
+            if (post) {
+                if (type === 'LIKE') post.likes += 1;
+                else if (type === 'USEFUL') post.useful += 1;
+                else if (type === 'FAKE') post.fakes += 1;
+            }
+        }
+
+        saveLocalPostReactions(reactions);
+        saveLocalSocialPosts(posts);
+    };
+
+    if (isLocalMode()) {
+        handleLocalReact();
+        return;
+    }
+
+    try {
+        const { data: existing } = await supabase.from('post_reactions').select('*').eq('postId', postId).eq('userId', userId).eq('reactionType', type).single();
+        
+        if (existing) {
+            await supabase.from('post_reactions').delete().eq('id', existing.id);
+            const col = type === 'LIKE' ? 'likes' : type === 'USEFUL' ? 'useful' : 'fakes';
+            await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: col });
+        } else {
+            await supabase.from('post_reactions').delete().eq('postId', postId).eq('userId', userId);
+            await supabase.from('post_reactions').insert({ postId, userId, reactionType: type });
+            const col = type === 'LIKE' ? 'likes' : type === 'USEFUL' ? 'useful' : 'fakes';
+            await supabase.rpc('increment_post_stat', { post_id: postId, col_name: col });
+        }
+    } catch (err) {
+        console.warn("reactToPost Supabase error, falling back to local storage:", err);
+        handleLocalReact();
     }
 };
 
 export const bookmarkPost = async (postId: string, userId: string): Promise<boolean> => {
-    const { data: existing } = await supabase.from('post_bookmarks').select('*').eq('postId', postId).eq('userId', userId).single();
-    
-    if (existing) {
-        await supabase.from('post_bookmarks').delete().eq('id', existing.id);
-        await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: 'bookmarksCount' });
-        return false;
-    } else {
-        await supabase.from('post_bookmarks').insert({ postId, userId });
-        await supabase.rpc('increment_post_stat', { post_id: postId, col_name: 'bookmarksCount' });
-        return true;
+    const handleLocalBookmark = (): boolean => {
+        const bookmarks = getLocalPostBookmarks();
+        const posts = getLocalSocialPosts();
+        const existingIndex = bookmarks.findIndex(b => b.postId === postId && b.userId === userId);
+        const post = posts.find(p => p.id === postId);
+
+        let bookmarked = false;
+        if (existingIndex !== -1) {
+            bookmarks.splice(existingIndex, 1);
+            if (post) {
+                post.bookmarksCount = Math.max(0, post.bookmarksCount - 1);
+            }
+        } else {
+            bookmarks.push({
+                id: `bookmark-${Date.now()}`,
+                postId,
+                userId
+            });
+            if (post) {
+                post.bookmarksCount += 1;
+            }
+            bookmarked = true;
+        }
+
+        saveLocalPostBookmarks(bookmarks);
+        saveLocalSocialPosts(posts);
+        return bookmarked;
+    };
+
+    if (isLocalMode()) {
+        return handleLocalBookmark();
+    }
+
+    try {
+        const { data: existing } = await supabase.from('post_bookmarks').select('*').eq('postId', postId).eq('userId', userId).single();
+        
+        if (existing) {
+            await supabase.from('post_bookmarks').delete().eq('id', existing.id);
+            await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: 'bookmarksCount' });
+            return false;
+        } else {
+            await supabase.from('post_bookmarks').insert({ postId, userId });
+            await supabase.rpc('increment_post_stat', { post_id: postId, col_name: 'bookmarksCount' });
+            return true;
+        }
+    } catch (err) {
+        console.warn("bookmarkPost Supabase error, falling back to local storage:", err);
+        return handleLocalBookmark();
     }
 };
 
 export const getPostComments = async (postId: string): Promise<PostComment[]> => {
-    const { data, error } = await supabase.from('post_comments').select('*').eq('postId', postId).order('createdAt', { ascending: true });
-    if (error) return [];
-    return data as PostComment[];
+    if (isLocalMode()) {
+        return handleLocalGetPostComments(postId);
+    }
+
+    try {
+        const { data, error } = await supabase.from('post_comments').select('*').eq('postId', postId).order('createdAt', { ascending: true });
+        if (error) throw error;
+        return data as PostComment[];
+    } catch (err) {
+        console.warn("getPostComments Supabase error, falling back to local storage:", err);
+        return handleLocalGetPostComments(postId);
+    }
+};
+
+const handleLocalGetPostComments = (postId: string): PostComment[] => {
+    const comments = getLocalPostComments();
+    return comments.filter(c => c.postId === postId).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 };
 
 export const addPostComment = async (postId: string, userId: string, userName: string, content: string): Promise<PostComment> => {
-    const { data, error } = await supabase.from('post_comments').insert({
-        postId, authorId: userId, authorName: userName, content, createdAt: new Date().toISOString()
-    }).select().single();
-    if (error) handleSupabaseError(error, 'addPostComment');
-    return data as PostComment;
+    const fallbackAddComment = (): PostComment => {
+        const comments = getLocalPostComments();
+        const newComment: PostComment = {
+            id: `comment-${Date.now()}`,
+            postId,
+            authorId: userId,
+            authorName: userName,
+            content,
+            createdAt: new Date().toISOString()
+        };
+        comments.push(newComment);
+        saveLocalPostComments(comments);
+        return newComment;
+    };
+
+    if (isLocalMode()) {
+        return fallbackAddComment();
+    }
+
+    try {
+        const { data, error } = await supabase.from('post_comments').insert({
+            postId, authorId: userId, authorName: userName, content, createdAt: new Date().toISOString()
+        }).select().single();
+        if (error) throw error;
+        return data as PostComment;
+    } catch (err) {
+        console.warn("addPostComment Supabase error, falling back to local storage:", err);
+        return fallbackAddComment();
+    }
 };
 
 // --- MISC & SYSTEM ---

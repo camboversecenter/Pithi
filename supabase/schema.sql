@@ -365,7 +365,7 @@ create policy "Enable insert for organizers and general users"
     on public.ceremonies for insert
     with check (
         public.get_my_role() in ('ORGANIZER', 'GENERAL_USER', 'ADMIN') 
-        and auth.uid() = "organizerId"
+        and (auth.uid() = "organizerId" or auth.uid() = "ownerId")
     );
 
 -- Updating ceremonies: Restricted to creators and owners.

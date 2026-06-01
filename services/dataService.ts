@@ -7,11 +7,6 @@ import {
 import { supabase } from './supabaseConfig';
 
 // --- HELPER ---
-const handleSupabaseError = (error: any, context: string) => {
-    console.error(`Error in ${context}:`, error);
-    throw new Error(error.message || `Error in ${context}`);
-};
-
 const isLocalMode = () => {
     return !!localStorage.getItem('pithi_mock_user');
 };
@@ -149,7 +144,10 @@ export const createCeremony = async (data: Partial<Ceremony>): Promise<Ceremony>
             invitationMessage: data.invitationMessage || '',
             themeColor: data.themeColor || '#e11d48',
             khqrUrl: data.khqrUrl || undefined,
-            bannerUrl: data.bannerUrl || undefined
+            bannerUrl: data.bannerUrl || undefined,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
         };
         ceremonies.push(newCeremony);
         saveLocalCeremonies(ceremonies);
@@ -160,7 +158,12 @@ export const createCeremony = async (data: Partial<Ceremony>): Promise<Ceremony>
         return fallbackCreate();
     }
     try {
-        const { data: result, error } = await supabase.from('ceremonies').insert(data).select().single();
+        const { data: result, error } = await supabase.from('ceremonies').insert({
+            ...data,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
         if (error) throw error;
         return result as Ceremony;
     } catch (err) {
@@ -174,7 +177,7 @@ export const updateCeremony = async (id: string, data: Partial<Ceremony>): Promi
         const ceremonies = getLocalCeremonies();
         const index = ceremonies.findIndex(c => c.id === id);
         if (index === -1) return null;
-        ceremonies[index] = { ...ceremonies[index], ...data };
+        ceremonies[index] = { ...ceremonies[index], ...data, updatedAt: new Date().toISOString() };
         saveLocalCeremonies(ceremonies);
         return ceremonies[index];
     };
@@ -183,7 +186,10 @@ export const updateCeremony = async (id: string, data: Partial<Ceremony>): Promi
         return fallbackUpdate();
     }
     try {
-        const { data: result, error } = await supabase.from('ceremonies').update(data).eq('id', id).select().single();
+        const { data: result, error } = await supabase.from('ceremonies').update({
+            ...data,
+            updatedAt: new Date().toISOString()
+        }).eq('id', id).select().single();
         if (error) throw error;
         return result as Ceremony;
     } catch (err) {
@@ -394,7 +400,10 @@ export const createService = async (data: Partial<Service>): Promise<Service> =>
             location: data.location || '',
             locationType: data.locationType || 'FIXED',
             mapUrl: data.mapUrl || undefined,
-            imageUrl: data.imageUrl || undefined
+            imageUrl: data.imageUrl || undefined,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
         };
         local.push(newService);
         saveLocalServices(local);
@@ -406,7 +415,12 @@ export const createService = async (data: Partial<Service>): Promise<Service> =>
     }
 
     try {
-        const { data: result, error } = await supabase.from('services').insert(data).select().single();
+        const { data: result, error } = await supabase.from('services').insert({
+            ...data,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
         if (error) throw error;
         return result as Service;
     } catch (err) {
@@ -420,12 +434,18 @@ export const updateService = async (id: string, data: Partial<Service>): Promise
         const local = getLocalServices();
         const index = local.findIndex(s => s.id === id);
         if (index === -1) {
-            const newService = { ...data, id } as Service;
+            const newService = {
+                ...data,
+                id,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                deletedAt: null
+            } as Service;
             local.push(newService);
             saveLocalServices(local);
             return newService;
         }
-        local[index] = { ...local[index], ...data };
+        local[index] = { ...local[index], ...data, updatedAt: new Date().toISOString() };
         saveLocalServices(local);
         return local[index];
     };
@@ -435,7 +455,10 @@ export const updateService = async (id: string, data: Partial<Service>): Promise
     }
 
     try {
-        const { data: result, error } = await supabase.from('services').update(data).eq('id', id).select().single();
+        const { data: result, error } = await supabase.from('services').update({
+            ...data,
+            updatedAt: new Date().toISOString()
+        }).eq('id', id).select().single();
         if (error) throw error;
         return result as Service;
     } catch (err) {
@@ -465,183 +488,757 @@ export const deleteService = async (id: string): Promise<void> => {
     }
 };
 
+// --- LOCAL FALLBACK HELPERS FOR BOOKINGS, GUESTS, COMMONS, TRANSACTIONS, ETC. ---
+
+const getLocalBookings = (): Booking[] => {
+    try {
+        const bookingsJson = localStorage.getItem('pithi_local_bookings');
+        if (!bookingsJson) {
+            const demoBookings: Booking[] = [
+                {
+                    id: 'b1',
+                    serviceId: '1',
+                    ceremonyId: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    bookedByUserId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e503',
+                    providerId: 'provider-1',
+                    providerName: 'Classic Band Team',
+                    date: '2026-11-18',
+                    startTime: '07:30',
+                    endTime: '12:00',
+                    status: BookingStatus.PENDING,
+                    serviceName: 'ក្រុមតន្ត្រីបុរាណខ្មែរប្រណីត (Premium Khmer Classical Band)',
+                    price: 350,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                },
+                {
+                    id: 'b2',
+                    serviceId: '2',
+                    ceremonyId: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    bookedByUserId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e503',
+                    providerId: 'provider-2',
+                    providerName: 'Wedding Venue Service',
+                    date: '2026-11-18',
+                    startTime: '13:30',
+                    endTime: '22:00',
+                    status: BookingStatus.CONFIRMED,
+                    serviceName: 'សាលពិធីមង្គលការលំដាប់តារាប្រាំ (Five-Star Wedding Hall)',
+                    price: 1500,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                }
+            ];
+            localStorage.setItem('pithi_local_bookings', JSON.stringify(demoBookings));
+            return demoBookings;
+        }
+        return JSON.parse(bookingsJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalBookings = (bookings: Booking[]) => {
+    localStorage.setItem('pithi_local_bookings', JSON.stringify(bookings));
+};
+
+const getLocalGuests = (): Guest[] => {
+    try {
+        const guestsJson = localStorage.getItem('pithi_local_guests');
+        if (!guestsJson) {
+            const demoGuests: Guest[] = [
+                {
+                    id: 'g1',
+                    ceremonyId: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    name: 'កែវ សុខា (Keo Sokha)',
+                    phoneNumber: '012345678',
+                    status: GuestStatus.PENDING,
+                    guestType: 'FAMILY',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                },
+                {
+                    id: 'g2',
+                    ceremonyId: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    name: 'ចាន់ មុន្នី (Chan Mony)',
+                    phoneNumber: '087654321',
+                    status: GuestStatus.ACCEPTED,
+                    guestType: 'FRIEND',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                }
+            ];
+            localStorage.setItem('pithi_local_guests', JSON.stringify(demoGuests));
+            return demoGuests;
+        }
+        return JSON.parse(guestsJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalGuests = (guests: Guest[]) => {
+    localStorage.setItem('pithi_local_guests', JSON.stringify(guests));
+};
+
+const getLocalBookingComments = (): BookingComment[] => {
+    try {
+        const commentsJson = localStorage.getItem('pithi_local_booking_comments');
+        if (!commentsJson) return [];
+        return JSON.parse(commentsJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalBookingComments = (comments: BookingComment[]) => {
+    localStorage.setItem('pithi_local_booking_comments', JSON.stringify(comments));
+};
+
+const getLocalBookingLogs = (): BookingLog[] => {
+    try {
+        const logsJson = localStorage.getItem('pithi_local_booking_logs');
+        if (!logsJson) return [];
+        return JSON.parse(logsJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalBookingLogs = (logs: BookingLog[]) => {
+    localStorage.setItem('pithi_local_booking_logs', JSON.stringify(logs));
+};
+
+const getLocalInvitationTemplates = (): InvitationTemplate[] => {
+    try {
+        const key = 'pithi_local_invitation_templates';
+        const templatesJson = localStorage.getItem(key);
+        if (!templatesJson) {
+            const demoTemplates: InvitationTemplate[] = [
+                {
+                    id: 't1',
+                    ceremonyId: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    type: 'Standard',
+                    message: 'សូមគោរពអញ្ជើញឯកឧត្តម លោកជំទាវ លោកប្រុស លោកស្រី ចូលរួមជាអធិបតី និងជាភ្ញៀវកិត្តិយសក្នុងពិធីមង្គលការកូនរបស់យើងខ្ញុំ។',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                }
+            ];
+            localStorage.setItem(key, JSON.stringify(demoTemplates));
+            return demoTemplates;
+        }
+        return JSON.parse(templatesJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalInvitationTemplates = (templates: InvitationTemplate[]) => {
+    localStorage.setItem('pithi_local_invitation_templates', JSON.stringify(templates));
+};
+
+const getLocalTransactions = (): Transaction[] => {
+    try {
+        const key = 'pithi_local_transactions';
+        const transJson = localStorage.getItem(key);
+        if (!transJson) {
+            const demoTrans: Transaction[] = [
+                {
+                    id: 'tr1',
+                    ceremonyId: 'c1c1c1c1-b2b2-c3c3-d4d4-e5e5e5e5e501',
+                    donorName: 'ហេង ស្រីពៅ (Heng Sreypov)',
+                    amount: 50,
+                    type: 'INCOME',
+                    category: 'Gift',
+                    date: '2026-11-18',
+                    giftDescription: 'ចងដៃមង្គលការ',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                }
+            ];
+            localStorage.setItem(key, JSON.stringify(demoTrans));
+            return demoTrans;
+        }
+        return JSON.parse(transJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalTransactions = (trans: Transaction[]) => {
+    localStorage.setItem('pithi_local_transactions', JSON.stringify(trans));
+};
+
+const getLocalReportedTransactions = (): ReportedTransaction[] => {
+    try {
+        const key = 'pithi_local_reported_transactions';
+        const repJson = localStorage.getItem(key);
+        if (!repJson) return [];
+        return JSON.parse(repJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalReportedTransactions = (reps: ReportedTransaction[]) => {
+    localStorage.setItem('pithi_local_reported_transactions', JSON.stringify(reps));
+};
+
+const getLocalReviews = (): Review[] => {
+    try {
+        const key = 'pithi_local_reviews';
+        const revsJson = localStorage.getItem(key);
+        if (!revsJson) {
+            const demoReviews: Review[] = [
+                {
+                    id: 'r1',
+                    serviceId: '1',
+                    userId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e503',
+                    userName: 'Sophea & Chantrea',
+                    rating: 5,
+                    comment: 'ក្រុមភ្លេងលេងបានពីរោះរណ្តំចិត្តណាស់! ភ្ញៀវសរសើរគ្រប់គ្នាតែម្តង។ សេវាកម្មល្អឥតខ្ចោះ!',
+                    date: '2026-05-15',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    deletedAt: null
+                }
+            ];
+            localStorage.setItem(key, JSON.stringify(demoReviews));
+            return demoReviews;
+        }
+        return JSON.parse(revsJson);
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalReviews = (reviews: Review[]) => {
+    localStorage.setItem('pithi_local_reviews', JSON.stringify(reviews));
+};
+
 // --- BOOKINGS ---
 
 export const getBookings = async (userId: string, role: UserRole, page: number, limit: number, timeFilter: 'UPCOMING' | 'PAST' | 'ALL'): Promise<PaginatedResponse<Booking>> => {
-    let query = supabase.from('bookings').select('*, ceremonies(title)', { count: 'exact' });
+    const fallbackGet = () => {
+        let local = getLocalBookings();
+        if (role === UserRole.ORGANIZER || role === UserRole.GENERAL_USER) {
+            local = local.filter(b => b.bookedByUserId === userId);
+        } else {
+            local = local.filter(b => b.providerId === userId);
+        }
 
-    if (role === UserRole.ORGANIZER || role === UserRole.GENERAL_USER) {
-        query = query.eq('bookedByUserId', userId);
-    } else {
-        query = query.eq('providerId', userId);
-    }
+        const today = new Date().toISOString().split('T')[0];
+        if (timeFilter === 'UPCOMING') {
+            local = local.filter(b => b.date >= today);
+        } else if (timeFilter === 'PAST') {
+            local = local.filter(b => b.date < today);
+        }
 
-    const today = new Date().toISOString().split('T')[0];
-    if (timeFilter === 'UPCOMING') {
-        query = query.gte('date', today);
-    } else if (timeFilter === 'PAST') {
-        query = query.lt('date', today);
-    }
+        local.sort((a, b) => a.date.localeCompare(b.date));
 
-    query = query.order('date', { ascending: true });
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pageItems = local.slice(from, to);
 
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
+        const ceremonies = getLocalCeremonies();
+        const mappedData = pageItems.map(b => {
+            const ceremony = ceremonies.find(c => c.id === b.ceremonyId);
+            return {
+                ...b,
+                ceremonyTitle: ceremony?.title || 'Unknown Ceremony'
+            };
+        });
 
-    const { data, error, count } = await query;
-    if (error) handleSupabaseError(error, 'getBookings');
-
-    const mappedData = (data as any[] || []).map(b => ({
-        ...b,
-        ceremonyTitle: b.ceremonies?.title || 'Unknown Ceremony'
-    }));
-
-    return {
-        data: mappedData as Booking[],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
+        return {
+            data: mappedData,
+            total: local.length,
+            page,
+            limit,
+            totalPages: Math.ceil(local.length / limit)
+        };
     };
+
+    if (isLocalMode()) {
+        return fallbackGet();
+    }
+
+    try {
+        let query = supabase.from('bookings').select('*, ceremonies(title)', { count: 'exact' });
+
+        if (role === UserRole.ORGANIZER || role === UserRole.GENERAL_USER) {
+            query = query.eq('bookedByUserId', userId);
+        } else {
+            query = query.eq('providerId', userId);
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        if (timeFilter === 'UPCOMING') {
+            query = query.gte('date', today);
+        } else if (timeFilter === 'PAST') {
+            query = query.lt('date', today);
+        }
+
+        query = query.order('date', { ascending: true });
+
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+        if (error) throw error;
+
+        const mappedData = (data as any[] || []).map(b => ({
+            ...b,
+            ceremonyTitle: b.ceremonies?.title || 'Unknown Ceremony'
+        }));
+
+        return {
+            data: mappedData as Booking[],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getBookings Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const getBookingsByService = async (serviceId: string): Promise<Booking[]> => {
-    const { data, error } = await supabase.from('bookings').select('*, ceremonies(title)')
-        .eq('serviceId', serviceId)
-        .neq('status', BookingStatus.CANCELLED);
-    
-    if (error) handleSupabaseError(error, 'getBookingsByService');
-    
-    return (data as any[] || []).map(b => ({
-        ...b,
-        ceremonyTitle: b.ceremonies?.title || 'Unknown Ceremony'
-    })) as Booking[];
+    const fallbackGet = () => {
+        const local = getLocalBookings().filter(b => b.serviceId === serviceId && b.status !== BookingStatus.CANCELLED);
+        const ceremonies = getLocalCeremonies();
+        return local.map(b => {
+            const ceremony = ceremonies.find(c => c.id === b.ceremonyId);
+            return {
+                ...b,
+                ceremonyTitle: ceremony?.title || 'Unknown Ceremony'
+            };
+        });
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('bookings').select('*, ceremonies(title)')
+            .eq('serviceId', serviceId)
+            .neq('status', BookingStatus.CANCELLED);
+        
+        if (error) throw error;
+        
+        return (data as any[] || []).map(b => ({
+            ...b,
+            ceremonyTitle: b.ceremonies?.title || 'Unknown Ceremony'
+        })) as Booking[];
+    } catch (err) {
+        console.warn("getBookingsByService Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const getBookingById = async (id: string): Promise<Booking | null> => {
-    const { data, error } = await supabase.from('bookings').select('*, ceremonies(title)').eq('id', id).single();
-    if (error || !data) return null;
-    
-    return {
-        ...data,
-        ceremonyTitle: (data as any).ceremonies?.title || 'Unknown Ceremony'
-    } as Booking;
+    const fallbackGet = () => {
+        const b = getLocalBookings().find(x => x.id === id);
+        if (!b) return null;
+        const ceremony = getLocalCeremonies().find(c => c.id === b.ceremonyId);
+        return {
+            ...b,
+            ceremonyTitle: ceremony?.title || 'Unknown Ceremony'
+        };
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('bookings').select('*, ceremonies(title)').eq('id', id).single();
+         if (error || !data) throw error || new Error('Not found');
+        
+        return {
+            ...data,
+            ceremonyTitle: (data as any).ceremonies?.title || 'Unknown Ceremony'
+        } as Booking;
+    } catch (err) {
+        console.warn("getBookingById Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const createBooking = async (data: Partial<Booking>): Promise<Booking> => {
-    const { data: result, error } = await supabase.from('bookings').insert({
-        ...data,
-        status: BookingStatus.PENDING,
-        createdAt: new Date().toISOString()
-    }).select().single();
-    if (error) handleSupabaseError(error, 'createBooking');
-    return result as Booking;
+    const fallbackCreate = () => {
+        const local = getLocalBookings();
+        const service = getLocalServices().find(s => s.id === data.serviceId);
+        const newBooking: Booking = {
+            id: 'b-' + Math.random().toString(36).substr(2, 9),
+            serviceId: data.serviceId || '',
+            ceremonyId: data.ceremonyId || '',
+            bookedByUserId: data.bookedByUserId || '',
+            bookedByUserName: data.bookedByUserName || 'Guest',
+            providerId: data.providerId || service?.providerId || '',
+            providerName: service?.providerName || '',
+            date: data.date || '',
+            startTime: data.startTime || '',
+            endTime: data.endTime || '',
+            status: BookingStatus.PENDING,
+            serviceName: data.serviceName || service?.name || 'Unknown Service',
+            price: data.price || service?.price || 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newBooking);
+        saveLocalBookings(local);
+        addLocalBookingLog(newBooking.id, "CREATED", "Booking created", newBooking.bookedByUserId, newBooking.bookedByUserName || 'Guest');
+        return newBooking;
+    };
+
+    if (isLocalMode()) return fallbackCreate();
+
+    try {
+        const { data: result, error } = await supabase.from('bookings').insert({
+            ...data,
+            status: BookingStatus.PENDING,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
+        if (error) throw error;
+        return result as Booking;
+    } catch (err) {
+        console.warn("createBooking Supabase error, falling back to local storage:", err);
+        return fallbackCreate();
+    }
 };
 
 export const updateBookingStatus = async (id: string, status: BookingStatus): Promise<void> => {
-    const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
-    if (error) handleSupabaseError(error, 'updateBookingStatus');
+    const fallbackUpdate = () => {
+        const local = getLocalBookings();
+        const index = local.findIndex(b => b.id === id);
+        if (index !== -1) {
+            local[index].status = status;
+            local[index].updatedAt = new Date().toISOString();
+            saveLocalBookings(local);
+        }
+    };
+
+    if (isLocalMode()) {
+        fallbackUpdate();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('bookings').update({ 
+            status,
+            updatedAt: new Date().toISOString()
+        }).eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("updateBookingStatus Supabase error, falling back to local storage:", err);
+        fallbackUpdate();
+    }
 };
 
 export const updateBookingSchedule = async (id: string, date: string, startTime: string, endTime: string, userId: string, userName: string): Promise<Booking> => {
-    const { data, error } = await supabase.from('bookings').update({ date, startTime, endTime }).eq('id', id).select('*, ceremonies(title)').single();
-    if (error) handleSupabaseError(error, 'updateBookingSchedule');
-    
-    await addBookingLog(id, "SCHEDULE_CHANGE", `Updated to ${date} ${startTime}-${endTime}`, userId, userName);
-    
-    return {
-        ...data,
-        ceremonyTitle: (data as any).ceremonies?.title || 'Unknown Ceremony'
-    } as Booking;
+    const fallbackUpdate = () => {
+        const local = getLocalBookings();
+        const index = local.findIndex(b => b.id === id);
+        if (index === -1) throw new Error('Booking not found');
+        
+        local[index] = {
+            ...local[index],
+            date,
+            startTime,
+            endTime,
+            updatedAt: new Date().toISOString()
+        };
+        saveLocalBookings(local);
+        addLocalBookingLog(id, "SCHEDULE_CHANGE", `Updated to ${date} ${startTime}-${endTime}`, userId, userName);
+        
+        const ceremony = getLocalCeremonies().find(c => c.id === local[index].ceremonyId);
+        return {
+            ...local[index],
+            ceremonyTitle: ceremony?.title || 'Unknown Ceremony'
+        };
+    };
+
+    if (isLocalMode()) return fallbackUpdate();
+
+    try {
+        const { data, error } = await supabase.from('bookings').update({ 
+            date, 
+            startTime, 
+            endTime,
+            updatedAt: new Date().toISOString()
+        }).eq('id', id).select('*, ceremonies(title)').single();
+        if (error) throw error;
+        
+        await addBookingLog(id, "SCHEDULE_CHANGE", `Updated to ${date} ${startTime}-${endTime}`, userId, userName);
+        
+        return {
+            ...data,
+            ceremonyTitle: (data as any).ceremonies?.title || 'Unknown Ceremony'
+        } as Booking;
+    } catch (err) {
+        console.warn("updateBookingSchedule Supabase error, falling back to local storage:", err);
+        return fallbackUpdate();
+    }
 };
 
 export const deleteBooking = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('bookings').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteBooking');
+    const fallbackDelete = () => {
+        const local = getLocalBookings();
+        const filtered = local.filter(b => b.id !== id);
+        saveLocalBookings(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('bookings').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("deleteBooking Supabase error, falling back to local storage:", err);
+        fallbackDelete();
+    }
 };
 
 export const getBookingComments = async (bookingId: string): Promise<BookingComment[]> => {
-    const { data, error } = await supabase.from('booking_comments').select('*').eq('bookingId', bookingId).order('timestamp', { ascending: true });
-    if (error) return [];
-    return data as BookingComment[];
+    const fallbackGet = () => {
+        return getLocalBookingComments().filter(c => c.bookingId === bookingId).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('booking_comments').select('*').eq('bookingId', bookingId).order('timestamp', { ascending: true });
+        if (error) throw error;
+        return data as BookingComment[];
+    } catch (err) {
+        console.warn("getBookingComments Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const addBookingComment = async (bookingId: string, userId: string, userName: string, role: UserRole, content: string): Promise<BookingComment> => {
-    const { data, error } = await supabase.from('booking_comments').insert({
-        bookingId, userId, userName, role, content, timestamp: new Date().toISOString()
-    }).select().single();
-    if (error) handleSupabaseError(error, 'addBookingComment');
-    return data as BookingComment;
+    const fallbackAdd = () => {
+        const local = getLocalBookingComments();
+        const newComment: BookingComment = {
+            id: 'bc-' + Math.random().toString(36).substr(2, 9),
+            bookingId,
+            userId,
+            userName,
+            role,
+            content,
+            timestamp: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newComment);
+        saveLocalBookingComments(local);
+        return newComment;
+    };
+
+    if (isLocalMode()) return fallbackAdd();
+
+    try {
+        const { data, error } = await supabase.from('booking_comments').insert({
+            bookingId, userId, userName, role, content, 
+            timestamp: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
+        if (error) throw error;
+        return data as BookingComment;
+    } catch (err) {
+        console.warn("addBookingComment Supabase error, falling back to local storage:", err);
+        return fallbackAdd();
+    }
 };
 
 export const getBookingLogs = async (bookingId: string): Promise<BookingLog[]> => {
-    const { data, error } = await supabase.from('booking_logs').select('*').eq('bookingId', bookingId).order('timestamp', { ascending: true });
-    if (error) return [];
-    return data as BookingLog[];
+    const fallbackGet = () => {
+        return getLocalBookingLogs().filter(l => l.bookingId === bookingId).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('booking_logs').select('*').eq('bookingId', bookingId).order('timestamp', { ascending: true });
+        if (error) throw error;
+        return data as BookingLog[];
+    } catch (err) {
+        console.warn("getBookingLogs Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
+};
+
+const addLocalBookingLog = (bookingId: string, action: string, details: string, userId: string, userName: string) => {
+    const local = getLocalBookingLogs();
+    const newLog: BookingLog = {
+        id: 'bl-' + Math.random().toString(36).substr(2, 9),
+        bookingId,
+        action,
+        details,
+        userId,
+        userName,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        deletedAt: null
+    };
+    local.push(newLog);
+    saveLocalBookingLogs(local);
 };
 
 const addBookingLog = async (bookingId: string, action: string, details: string, userId: string, userName: string) => {
-    await supabase.from('booking_logs').insert({
-        bookingId, action, details, userId, userName, timestamp: new Date().toISOString()
-    });
+    if (isLocalMode()) {
+        addLocalBookingLog(bookingId, action, details, userId, userName);
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('booking_logs').insert({
+            bookingId, action, details, userId, userName, 
+            timestamp: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        });
+        if (error) throw error;
+    } catch (err) {
+        console.warn("addBookingLog Supabase error, falling back to local storage:", err);
+        addLocalBookingLog(bookingId, action, details, userId, userName);
+    }
 };
 
 // --- GUESTS & INVITATIONS ---
 
 export const getGuests = async (ceremonyId: string, page = 1, limit = 1000): Promise<PaginatedResponse<Guest>> => {
-    const { data, error, count } = await supabase.from('guests').select('*', { count: 'exact' }).eq('ceremonyId', ceremonyId);
-    if (error) handleSupabaseError(error, 'getGuests');
-    
-    return {
-        data: (data as Guest[]) || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
+    const fallbackGet = () => {
+        const local = getLocalGuests().filter(g => g.ceremonyId === ceremonyId);
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pageItems = local.slice(from, to);
+        return {
+            data: pageItems,
+            total: local.length,
+            page,
+            limit,
+            totalPages: Math.ceil(local.length / limit)
+        };
     };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error, count } = await supabase.from('guests').select('*', { count: 'exact' }).eq('ceremonyId', ceremonyId);
+        if (error) throw error;
+        
+        return {
+            data: (data as Guest[]) || [],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getGuests Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const addGuest = async (data: Partial<Guest>): Promise<Guest> => {
-    const { data: result, error } = await supabase.from('guests').insert({
-        ...data,
-        status: data.status || GuestStatus.PENDING
-    }).select().single();
-    
-    if (error) handleSupabaseError(error, 'addGuest');
-    return result as Guest;
+    const fallbackAdd = () => {
+        const local = getLocalGuests();
+        const newGuest: Guest = {
+            id: 'g-' + Math.random().toString(36).substr(2, 9),
+            ceremonyId: data.ceremonyId || '',
+            userId: data.userId || undefined,
+            name: data.name || '',
+            phoneNumber: data.phoneNumber || '',
+            status: data.status || GuestStatus.PENDING,
+            guestType: data.guestType || 'FRIEND',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newGuest);
+        saveLocalGuests(local);
+        return newGuest;
+    };
+
+    if (isLocalMode()) return fallbackAdd();
+
+    try {
+        const { data: result, error } = await supabase.from('guests').insert({
+            ...data,
+            status: data.status || GuestStatus.PENDING,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
+        if (error) throw error;
+        return result as Guest;
+    } catch (err) {
+        console.warn("addGuest Supabase error, falling back to local storage:", err);
+        return fallbackAdd();
+    }
 };
 
 export const deleteGuest = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('guests').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteGuest');
+    const fallbackDelete = () => {
+        const local = getLocalGuests();
+        const filtered = local.filter(g => g.id !== id);
+        saveLocalGuests(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('guests').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("deleteGuest Supabase error, falling back to local storage:", err);
+        fallbackDelete();
+    }
 };
 
 export const getMyInvitations = async (userId: string, page = 1, limit = 10, status: 'UPCOMING' | 'PAST' | 'ALL' = 'UPCOMING'): Promise<PaginatedResponse<Invitation>> => {
-    const { data: guests, error: guestError } = await supabase.from('guests').select('*').eq('userId', userId);
-    if (guestError) handleSupabaseError(guestError, 'getMyInvitations - Guests');
-    
-    if (!guests || guests.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-    }
+    const fallbackGet = () => {
+        const guests = getLocalGuests().filter(g => g.userId === userId);
+        if (guests.length === 0) {
+            return {
+                data: [],
+                total: 0,
+                page,
+                limit,
+                totalPages: 0
+            };
+        }
 
-    const ceremonyIds = guests.map((g: Guest) => g.ceremonyId);
-    
-    let query = supabase.from('ceremonies').select('*').in('id', ceremonyIds);
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (status === 'UPCOMING') query = query.gte('date', today);
-    else if (status === 'PAST') query = query.lt('date', today);
-    
-    query = query.order('date', { ascending: true });
-    
-    const { data: ceremonies, error: cerError } = await query;
-    if (cerError) handleSupabaseError(cerError, 'getMyInvitations - Ceremonies');
+        const ceremonies = getLocalCeremonies();
+        const invitations: Invitation[] = [];
 
-    const invitations: Invitation[] = [];
-    if (ceremonies) {
+        const today = new Date().toISOString().split('T')[0];
+
         for (const c of ceremonies) {
-            const guestRecord = guests.find((g: Guest) => g.ceremonyId === c.id);
+            if (status === 'UPCOMING' && c.date < today) continue;
+            if (status === 'PAST' && c.date >= today) continue;
+
+            const guestRecord = guests.find(g => g.ceremonyId === c.id);
             if (guestRecord) {
                 invitations.push({
                     ...guestRecord,
@@ -652,134 +1249,505 @@ export const getMyInvitations = async (userId: string, page = 1, limit = 10, sta
                 });
             }
         }
-    }
 
-    const startIndex = (page - 1) * limit;
-    const paginatedItems = invitations.slice(startIndex, startIndex + limit);
+        const startIndex = (page - 1) * limit;
+        const paginatedItems = invitations.slice(startIndex, startIndex + limit);
 
-    return {
-        data: paginatedItems,
-        total: invitations.length,
-        page,
-        limit,
-        totalPages: Math.ceil(invitations.length / limit)
+        return {
+            data: paginatedItems,
+            total: invitations.length,
+            page,
+            limit,
+            totalPages: Math.ceil(invitations.length / limit)
+        };
     };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data: guests, error: guestError } = await supabase.from('guests').select('*').eq('userId', userId);
+        if (guestError) throw guestError;
+
+        if (!guests || guests.length === 0) {
+            return {
+                data: [],
+                total: 0,
+                page,
+                limit,
+                totalPages: 0
+            };
+        }
+
+        const ceremonyIds = guests.map((g: Guest) => g.ceremonyId);
+        let ceremonyQuery = supabase.from('ceremonies').select('*').in('id', ceremonyIds);
+
+        const today = new Date().toISOString().split('T')[0];
+        if (status === 'UPCOMING') {
+            ceremonyQuery = ceremonyQuery.gte('date', today);
+        } else if (status === 'PAST') {
+            ceremonyQuery = ceremonyQuery.lt('date', today);
+        }
+
+        const { data: ceremonies, error: ceremonyError } = await ceremonyQuery;
+        if (ceremonyError) throw ceremonyError;
+
+        const invitations: Invitation[] = [];
+        if (ceremonies) {
+            for (const c of ceremonies) {
+                const guestRecord = guests.find((g: Guest) => g.ceremonyId === c.id);
+                if (guestRecord) {
+                    invitations.push({
+                        ...guestRecord,
+                        ceremonyTitle: c.title,
+                        ceremonyDate: c.date,
+                        ceremonyLocation: c.location,
+                        bannerUrl: c.bannerUrl
+                    });
+                }
+            }
+        }
+
+        const startIndex = (page - 1) * limit;
+        const paginatedItems = invitations.slice(startIndex, startIndex + limit);
+
+        return {
+            data: paginatedItems,
+            total: invitations.length,
+            page,
+            limit,
+            totalPages: Math.ceil(invitations.length / limit)
+        };
+    } catch (err) {
+        console.warn("getMyInvitations Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const respondToInvitation = async (guestId: string, status: GuestStatus): Promise<void> => {
-    const { error } = await supabase.from('guests').update({ status }).eq('id', guestId);
-    if (error) handleSupabaseError(error, 'respondToInvitation');
+    const fallbackUpdate = () => {
+        const local = getLocalGuests();
+        const index = local.findIndex(g => g.id === guestId);
+        if (index !== -1) {
+            local[index].status = status;
+            local[index].updatedAt = new Date().toISOString();
+            saveLocalGuests(local);
+        }
+    };
+
+    if (isLocalMode()) {
+        fallbackUpdate();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('guests').update({ status }).eq('id', guestId);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("respondToInvitation Supabase error, falling back to local storage:", err);
+        fallbackUpdate();
+    }
 };
 
 export const getInvitationTemplates = async (ceremonyId: string): Promise<InvitationTemplate[]> => {
-    const { data, error } = await supabase.from('invitation_templates').select('*').eq('ceremonyId', ceremonyId);
-    if (error) return [];
-    return data as InvitationTemplate[];
+    const fallbackGet = () => {
+        return getLocalInvitationTemplates().filter(t => t.ceremonyId === ceremonyId);
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('invitation_templates').select('*').eq('ceremonyId', ceremonyId);
+        if (error) throw error;
+        return data as InvitationTemplate[];
+    } catch (err) {
+        console.warn("getInvitationTemplates Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const saveInvitationTemplate = async (data: Partial<InvitationTemplate>): Promise<InvitationTemplate> => {
-    if (data.id) {
-        const { data: res, error } = await supabase.from('invitation_templates').update(data).eq('id', data.id).select().single();
-        if (error) handleSupabaseError(error, 'saveInvitationTemplate Update');
-        return res as InvitationTemplate;
-    } else {
-        const { data: res, error } = await supabase.from('invitation_templates').insert(data).select().single();
-        if (error) handleSupabaseError(error, 'saveInvitationTemplate Insert');
-        return res as InvitationTemplate;
+    const fallbackSave = () => {
+        const local = getLocalInvitationTemplates();
+        if (data.id) {
+            const index = local.findIndex(t => t.id === data.id);
+            if (index !== -1) {
+                local[index] = {
+                    ...local[index],
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                };
+                saveLocalInvitationTemplates(local);
+                return local[index];
+            }
+        }
+        
+        const newTemplate: InvitationTemplate = {
+            id: data.id || 't-' + Math.random().toString(36).substr(2, 9),
+            ceremonyId: data.ceremonyId || '',
+            type: data.type || 'Standard',
+            message: data.message || '',
+            bannerUrl: data.bannerUrl,
+            expirationDate: data.expirationDate,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newTemplate);
+        saveLocalInvitationTemplates(local);
+        return newTemplate;
+    };
+
+    if (isLocalMode()) return fallbackSave();
+
+    try {
+        if (data.id) {
+            const { data: res, error } = await supabase.from('invitation_templates').update({
+                ...data,
+                updatedAt: new Date().toISOString()
+            }).eq('id', data.id).select().single();
+            if (error) throw error;
+            return res as InvitationTemplate;
+        } else {
+            const { data: res, error } = await supabase.from('invitation_templates').insert({
+                ...data,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                deletedAt: null
+            }).select().single();
+            if (error) throw error;
+            return res as InvitationTemplate;
+        }
+    } catch (err) {
+        console.warn("saveInvitationTemplate Supabase error, falling back to local storage:", err);
+        return fallbackSave();
     }
 };
 
 export const deleteInvitationTemplate = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('invitation_templates').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteInvitationTemplate');
+    const fallbackDelete = () => {
+        const local = getLocalInvitationTemplates();
+        const filtered = local.filter(t => t.id !== id);
+        saveLocalInvitationTemplates(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('invitation_templates').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("deleteInvitationTemplate Supabase error, falling back to local storage:", err);
+        fallbackDelete();
+    }
 };
 
 // --- TRANSACTIONS ---
 
 export const getTransactions = async (ceremonyId: string, page = 1, limit = 1000): Promise<PaginatedResponse<Transaction>> => {
-    const { data, error, count } = await supabase.from('transactions').select('*', { count: 'exact' }).eq('ceremonyId', ceremonyId);
-    if (error) handleSupabaseError(error, 'getTransactions');
-    
-    return {
-        data: (data as Transaction[]) || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
+    const fallbackGet = () => {
+        const local = getLocalTransactions().filter(t => t.ceremonyId === ceremonyId);
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pageItems = local.slice(from, to);
+        return {
+            data: pageItems,
+            total: local.length,
+            page,
+            limit,
+            totalPages: Math.ceil(local.length / limit)
+        };
     };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error, count } = await supabase.from('transactions').select('*', { count: 'exact' }).eq('ceremonyId', ceremonyId);
+        if (error) throw error;
+        
+        return {
+            data: (data as Transaction[]) || [],
+            total: count || 0,
+            page,
+            limit,
+            totalPages: Math.ceil((count || 0) / limit)
+        };
+    } catch (err) {
+        console.warn("getTransactions Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const addTransaction = async (data: Partial<Transaction>): Promise<Transaction> => {
-    const { data: result, error } = await supabase.from('transactions').insert(data).select().single();
-    if (error) handleSupabaseError(error, 'addTransaction');
-    return result as Transaction;
+    const fallbackAdd = () => {
+        const local = getLocalTransactions();
+        const newTrans: Transaction = {
+            id: 'tr-' + Math.random().toString(36).substr(2, 9),
+            ceremonyId: data.ceremonyId || '',
+            donorName: data.donorName,
+            expenseName: data.expenseName,
+            category: data.category || 'Gift',
+            amount: data.amount || 0,
+            giftDescription: data.giftDescription,
+            type: data.type || 'INCOME',
+            date: data.date || new Date().toISOString().split('T')[0],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newTrans);
+        saveLocalTransactions(local);
+        return newTrans;
+    };
+
+    if (isLocalMode()) return fallbackAdd();
+
+    try {
+        const { data: result, error } = await supabase.from('transactions').insert({
+            ...data,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
+        if (error) throw error;
+        return result as Transaction;
+    } catch (err) {
+        console.warn("addTransaction Supabase error, falling back to local storage:", err);
+        return fallbackAdd();
+    }
 };
 
 export const deleteTransaction = async (id: string): Promise<void> => {
-    const { error } = await supabase.from('transactions').delete().eq('id', id);
-    if (error) handleSupabaseError(error, 'deleteTransaction');
+    const fallbackDelete = () => {
+        const local = getLocalTransactions();
+        const filtered = local.filter(t => t.id !== id);
+        saveLocalTransactions(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('transactions').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("deleteTransaction Supabase error, falling back to local storage:", err);
+        fallbackDelete();
+    }
 };
 
 export const reportTransaction = async (data: Partial<ReportedTransaction>): Promise<ReportedTransaction> => {
-    const { data: result, error } = await supabase.from('reported_transactions').insert({
-        ...data,
-        status: 'PENDING',
-        timestamp: new Date().toISOString()
-    }).select().single();
-    if (error) handleSupabaseError(error, 'reportTransaction');
-    return result as ReportedTransaction;
+    const fallbackReport = () => {
+        const local = getLocalReportedTransactions();
+        const newRep: ReportedTransaction = {
+            id: 'rep-' + Math.random().toString(36).substr(2, 9),
+            ceremonyId: data.ceremonyId || '',
+            guestId: data.guestId || '',
+            guestName: data.guestName || '',
+            amount: data.amount || 0,
+            currency: data.currency || 'USD',
+            date: data.date || new Date().toISOString().split('T')[0],
+            senderNameFromReceipt: data.senderNameFromReceipt,
+            receiptImageUrl: data.receiptImageUrl || '',
+            status: 'PENDING',
+            timestamp: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newRep);
+        saveLocalReportedTransactions(local);
+        return newRep;
+    };
+
+    if (isLocalMode()) return fallbackReport();
+
+    try {
+        const { data: result, error } = await supabase.from('reported_transactions').insert({
+            ...data,
+            status: 'PENDING',
+            timestamp: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
+        if (error) throw error;
+        return result as ReportedTransaction;
+    } catch (err) {
+        console.warn("reportTransaction Supabase error, falling back to local storage:", err);
+        return fallbackReport();
+    }
 };
 
 export const getMyReportedTransactions = async (ceremonyId: string, guestId: string): Promise<ReportedTransaction[]> => {
-    const { data, error } = await supabase.from('reported_transactions').select('*').eq('ceremonyId', ceremonyId).eq('guestId', guestId);
-    if (error) return [];
-    return data as ReportedTransaction[];
+    const fallbackGet = () => {
+        return getLocalReportedTransactions().filter(r => r.ceremonyId === ceremonyId && r.guestId === guestId);
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('reported_transactions').select('*').eq('ceremonyId', ceremonyId).eq('guestId', guestId);
+        if (error) throw error;
+        return data as ReportedTransaction[];
+    } catch (err) {
+        console.warn("getMyReportedTransactions Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const getPendingReportedTransactions = async (ceremonyId: string): Promise<ReportedTransaction[]> => {
-    const { data, error } = await supabase.from('reported_transactions').select('*').eq('ceremonyId', ceremonyId).eq('status', 'PENDING');
-    if (error) return [];
-    return data as ReportedTransaction[];
+    const fallbackGet = () => {
+        return getLocalReportedTransactions().filter(r => r.ceremonyId === ceremonyId && r.status === 'PENDING');
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('reported_transactions').select('*').eq('ceremonyId', ceremonyId).eq('status', 'PENDING');
+        if (error) throw error;
+        return data as ReportedTransaction[];
+    } catch (err) {
+        console.warn("getPendingReportedTransactions Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const confirmReportedTransaction = async (reportId: string): Promise<void> => {
-    const { data: report, error } = await supabase.from('reported_transactions').update({ status: 'CONFIRMED' }).eq('id', reportId).select().single();
-    if (error || !report) handleSupabaseError(error || {}, 'confirmReportedTransaction');
+    const fallbackConfirm = async () => {
+        const local = getLocalReportedTransactions();
+        const index = local.findIndex(r => r.id === reportId);
+        if (index === -1) throw new Error('Report not found');
 
-    let amountUSD = report.amount;
-    if(report.currency === 'KHR') amountUSD = report.amount / 4000;
+        local[index].status = 'CONFIRMED';
+        local[index].updatedAt = new Date().toISOString();
+        saveLocalReportedTransactions(local);
 
-    await addTransaction({
-        ceremonyId: report.ceremonyId,
-        amount: amountUSD,
-        type: 'INCOME',
-        category: 'Gift',
-        donorName: report.guestName,
-        date: report.date,
-        giftDescription: `Bank Transfer (${report.currency} ${report.amount})`
-    });
+        const report = local[index];
+        let amountUSD = report.amount;
+        if (report.currency === 'KHR') amountUSD = report.amount / 4000;
+
+        await addTransaction({
+            ceremonyId: report.ceremonyId,
+            amount: amountUSD,
+            type: 'INCOME',
+            category: 'Gift',
+            donorName: report.guestName,
+            date: report.date,
+            giftDescription: `Bank Transfer (${report.currency} ${report.amount})`
+        });
+    };
+
+    if (isLocalMode()) {
+        await fallbackConfirm();
+        return;
+    }
+
+    try {
+        const { data: report, error } = await supabase.from('reported_transactions').update({ 
+            status: 'CONFIRMED',
+            updatedAt: new Date().toISOString()
+        }).eq('id', reportId).select().single();
+        if (error || !report) throw error || new Error('Report empty');
+
+        let amountUSD = report.amount;
+        if(report.currency === 'KHR') amountUSD = report.amount / 4000;
+
+        await addTransaction({
+            ceremonyId: report.ceremonyId,
+            amount: amountUSD,
+            type: 'INCOME',
+            category: 'Gift',
+            donorName: report.guestName,
+            date: report.date,
+            giftDescription: `Bank Transfer (${report.currency} ${report.amount})`
+        });
+    } catch (err) {
+        console.warn("confirmReportedTransaction Supabase error, falling back to local storage:", err);
+        await fallbackConfirm();
+    }
 };
 
 export const rejectReportedTransaction = async (reportId: string): Promise<void> => {
-    const { error } = await supabase.from('reported_transactions').delete().eq('id', reportId);
-    if (error) handleSupabaseError(error, 'rejectReportedTransaction');
+    const fallbackReject = () => {
+        const local = getLocalReportedTransactions();
+        const filtered = local.filter(r => r.id !== reportId);
+        saveLocalReportedTransactions(filtered);
+    };
+
+    if (isLocalMode()) {
+        fallbackReject();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from('reported_transactions').delete().eq('id', reportId);
+        if (error) throw error;
+    } catch (err) {
+        console.warn("rejectReportedTransaction Supabase error, falling back to local storage:", err);
+        fallbackReject();
+    }
 };
 
 // --- REVIEWS ---
 
 export const getReviews = async (): Promise<Review[]> => {
-    const { data, error } = await supabase.from('reviews').select('*').order('date', { ascending: false });
-    if (error) return [];
-    return data as Review[];
+    const fallbackGet = () => {
+        return getLocalReviews().sort((a, b) => b.date.localeCompare(a.date));
+    };
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        const { data, error } = await supabase.from('reviews').select('*').order('date', { ascending: false });
+        if (error) throw error;
+        return data as Review[];
+    } catch (err) {
+        console.warn("getReviews Supabase error, falling back to local storage:", err);
+        return fallbackGet();
+    }
 };
 
 export const addReview = async (data: Partial<Review>): Promise<Review> => {
-    const { data: result, error } = await supabase.from('reviews').insert({
-        ...data,
-        date: new Date().toISOString().split('T')[0]
-    }).select().single();
-    if (error) handleSupabaseError(error, 'addReview');
-    return result as Review;
+    const fallbackAdd = () => {
+        const local = getLocalReviews();
+        const newReview: Review = {
+            id: 'rev-' + Math.random().toString(36).substr(2, 9),
+            serviceId: data.serviceId || '',
+            userId: data.userId || '',
+            userName: data.userName || 'Guest',
+            rating: data.rating || 5,
+            comment: data.comment || '',
+            date: new Date().toISOString().split('T')[0],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        };
+        local.push(newReview);
+        saveLocalReviews(local);
+        return newReview;
+    };
+
+    if (isLocalMode()) return fallbackAdd();
+
+    try {
+        const { data: result, error } = await supabase.from('reviews').insert({
+            ...data,
+            date: new Date().toISOString().split('T')[0],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
+        }).select().single();
+        if (error) throw error;
+        return result as Review;
+    } catch (err) {
+        console.warn("addReview Supabase error, falling back to local storage:", err);
+        return fallbackAdd();
+    }
 };
 
 // --- SOCIAL POSTS ---
@@ -981,7 +1949,9 @@ export const createSocialPost = async (data: Partial<SocialPost>): Promise<Socia
             useful: 0,
             fakes: 0,
             bookmarksCount: 0,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
         };
         posts.unshift(newPost);
         saveLocalSocialPosts(posts);
@@ -996,6 +1966,8 @@ export const createSocialPost = async (data: Partial<SocialPost>): Promise<Socia
         const { data: result, error } = await supabase.from('social_posts').insert({
             ...data,
             createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null,
             likes: 0, useful: 0, fakes: 0, bookmarksCount: 0
         }).select().single();
         if (error) throw error;
@@ -1156,7 +2128,9 @@ export const addPostComment = async (postId: string, userId: string, userName: s
             authorId: userId,
             authorName: userName,
             content,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
         };
         comments.push(newComment);
         saveLocalPostComments(comments);
@@ -1169,7 +2143,13 @@ export const addPostComment = async (postId: string, userId: string, userName: s
 
     try {
         const { data, error } = await supabase.from('post_comments').insert({
-            postId, authorId: userId, authorName: userName, content, createdAt: new Date().toISOString()
+            postId, 
+            authorId: userId, 
+            authorName: userName, 
+            content, 
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null
         }).select().single();
         if (error) throw error;
         return data as PostComment;

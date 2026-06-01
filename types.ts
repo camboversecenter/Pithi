@@ -36,6 +36,9 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface CeremonyCategory {
@@ -58,6 +61,9 @@ export interface Ceremony {
   themeColor?: string;
   khqrUrl?: string; // KHQR Code Image URL
   bannerUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface InvitationTemplate {
@@ -67,6 +73,9 @@ export interface InvitationTemplate {
     message: string;
     bannerUrl?: string; 
     expirationDate?: string; 
+    createdAt?: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
 }
 
 export interface Service {
@@ -82,6 +91,9 @@ export interface Service {
   locationType?: 'FIXED' | 'FLEXIBLE';
   mapUrl?: string;
   imageUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface Booking {
@@ -100,6 +112,8 @@ export interface Booking {
   serviceName: string;
   price: number;
   createdAt?: string; 
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface Transaction {
@@ -112,6 +126,9 @@ export interface Transaction {
   giftDescription?: string; 
   type: 'INCOME' | 'EXPENSE' | 'GIFT';
   date: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface ReportedTransaction {
@@ -126,6 +143,9 @@ export interface ReportedTransaction {
   receiptImageUrl: string;
   status: 'PENDING' | 'CONFIRMED';
   timestamp: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface Guest {
@@ -136,6 +156,9 @@ export interface Guest {
   phoneNumber?: string;
   status: GuestStatus;
   guestType?: string; 
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface Review {
@@ -146,6 +169,9 @@ export interface Review {
     rating: number; 
     comment: string;
     date: string;
+    createdAt?: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
 }
 
 export interface Invitation extends Guest {
@@ -163,6 +189,9 @@ export interface BookingComment {
   role: UserRole;
   content: string;
   timestamp: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 export interface BookingLog {
@@ -173,6 +202,9 @@ export interface BookingLog {
   userId: string;
   userName: string;
   timestamp: string;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
 }
 
 // --- SOCIAL FEATURE TYPES ---
@@ -189,6 +221,8 @@ export interface SocialPost {
     fakes: number;
     bookmarksCount: number;
     createdAt: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
     // UI Only
     isBookmarked?: boolean;
     myReaction?: 'LIKE' | 'USEFUL' | 'FAKE' | null;
@@ -201,6 +235,8 @@ export interface PostComment {
     authorName: string;
     content: string;
     createdAt: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
 }
 
 export type PostReactionType = 'LIKE' | 'USEFUL' | 'FAKE';

@@ -31,6 +31,9 @@ create table if not exists public.users (
             'GENERAL_USER', 'ORGANIZER', 'CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON', 'ADMIN'
         )),
     "avatarUrl" text,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz,
     constraint unique_user_email unique (email)
 );
 
@@ -50,7 +53,10 @@ create table if not exists public.ceremonies (
     "invitationMessage" text,
     "themeColor" text,
     "khqrUrl" text,
-    "bannerUrl" text
+    "bannerUrl" text,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -71,7 +77,10 @@ create table if not exists public.services (
     location text not null,
     "locationType" text default 'FIXED' constraint check_location_type check ("locationType" in ('FIXED', 'FLEXIBLE')),
     "mapUrl" text,
-    "imageUrl" text
+    "imageUrl" text,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -90,7 +99,9 @@ create table if not exists public.bookings (
         constraint check_booking_status check (status in ('PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED')),
     "serviceName" text not null,
     price numeric(12, 2) not null,
-    "createdAt" timestamptz default now()
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -103,7 +114,10 @@ create table if not exists public.booking_comments (
     "userName" text not null,
     role text not null,
     content text not null,
-    timestamp timestamptz default now()
+    timestamp timestamptz default now(),
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -116,7 +130,10 @@ create table if not exists public.booking_logs (
     details text not null,
     "userId" uuid references public.users(id) on delete set null not null,
     "userName" text not null,
-    timestamp timestamptz default now()
+    timestamp timestamptz default now(),
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -130,7 +147,10 @@ create table if not exists public.guests (
     "phoneNumber" text,
     status text not null default 'PENDING'
         constraint check_guest_status check (status in ('PENDING', 'ACCEPTED', 'DECLINED')),
-    "guestType" text
+    "guestType" text,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -142,7 +162,10 @@ create table if not exists public.invitation_templates (
     type text not null,
     message text not null,
     "bannerUrl" text,
-    "expirationDate" date
+    "expirationDate" date,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -158,7 +181,10 @@ create table if not exists public.transactions (
     "giftDescription" text,
     type text not null
         constraint check_transaction_type check (type in ('INCOME', 'EXPENSE', 'GIFT')),
-    date date not null default current_date
+    date date not null default current_date,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -176,7 +202,10 @@ create table if not exists public.reported_transactions (
     "receiptImageUrl" text not null,
     status text not null default 'PENDING'
         constraint check_report_status check (status in ('PENDING', 'CONFIRMED')),
-    timestamp timestamptz default now()
+    timestamp timestamptz default now(),
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -189,7 +218,10 @@ create table if not exists public.reviews (
     "userName" text not null,
     rating integer not null constraint check_rating check (rating >= 1 and rating <= 5),
     comment text not null,
-    date date not null default current_date
+    date date not null default current_date,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -206,7 +238,9 @@ create table if not exists public.social_posts (
     useful integer not null default 0,
     fakes integer not null default 0,
     "bookmarksCount" integer not null default 0,
-    "createdAt" timestamptz default now()
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 -- --------------------------------------------------------------------
@@ -217,6 +251,9 @@ create table if not exists public.post_reactions (
     "postId" bigint references public.social_posts(id) on delete cascade not null,
     "userId" uuid references public.users(id) on delete cascade not null,
     "reactionType" text not null constraint check_reaction_type check ("reactionType" in ('LIKE', 'USEFUL', 'FAKE')),
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz,
     constraint unique_post_user_reaction unique ("postId", "userId")
 );
 
@@ -227,6 +264,9 @@ create table if not exists public.post_bookmarks (
     id bigint primary key generated always as identity,
     "postId" bigint references public.social_posts(id) on delete cascade not null,
     "userId" uuid references public.users(id) on delete cascade not null,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz,
     constraint unique_post_user_bookmark unique ("postId", "userId")
 );
 
@@ -239,7 +279,9 @@ create table if not exists public.post_comments (
     "authorId" uuid references public.users(id) on delete cascade not null,
     "authorName" text not null,
     content text not null,
-    "createdAt" timestamptz default now()
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
 );
 
 
@@ -807,6 +849,6 @@ end;
 $$;
 
 -- Note: Un-comment the trigger once your authentication pipeline is live!
--- create trigger on_auth_user_created
---     after insert on auth.users
---     for each row execute procedure public.handle_new_user();
+create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute procedure public.handle_new_user();

@@ -238,7 +238,7 @@ const InvitedCeremonies = () => {
     // --- DETAIL VIEW ---
     if (!selectedCeremony) return <div className="p-8 text-center text-slate-500">កំពុងផ្ទុក...</div>;
 
-    const isPast = new Date(selectedCeremony.date) < new Date(new Date().toDateString());
+    const isPast = selectedCeremony.date < new Date().toISOString().split('T')[0];
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto">

@@ -153,7 +153,7 @@ const BookingDetail = () => {
 
     // Permissions & Rules
     const isProvider = currentUser?.id === booking.providerId;
-    const isPastBooking = new Date(booking.date) < new Date(new Date().toDateString());
+    const isPastBooking = booking.date < new Date().toISOString().split('T')[0];
     
     // Merge Comments and Logs for Activity Feed
     const activityFeed = [

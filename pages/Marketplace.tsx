@@ -107,11 +107,9 @@ const Marketplace = () => {
       return { average: (sum / serviceReviews.length).toFixed(1), count: serviceReviews.length };
   };
 
-  const getTomorrowDate = () => {
+  const getTodayDate = () => {
       const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return tomorrow.toISOString().split('T')[0];
+      return today.toISOString().split('T')[0];
   };
 
   const handleBook = async () => {
@@ -375,7 +373,7 @@ const Marketplace = () => {
                         bookings={serviceBookings} 
                         selectedDate={bookingDate} 
                         onDateSelect={setBookingDate}
-                        minDate={getTomorrowDate()}
+                        minDate={getTodayDate()}
                      />
                      {bookingDate && (
                          <div className="mt-3 bg-slate-50 p-3 rounded-lg text-sm border border-slate-100">

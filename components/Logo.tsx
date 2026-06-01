@@ -173,24 +173,53 @@ export const Logo: React.FC<LogoProps> = ({
     </svg>
   );
 
+  // A helper to render the beautiful beige/cream tile box containing the emblem and the "DEVA PITHI" name below it
+  const renderTile = () => {
+    const isTiny = size === 'xs';
+    return (
+      <div className="relative flex flex-col items-center justify-center bg-gradient-to-br from-[#faf4e8] via-[#Fbf6ec] to-[#decdae] border border-[#cfbe9d] shadow-[0_2px_8px_rgba(80,50,15,0.06)] rounded-lg p-0.5 overflow-hidden w-full h-full">
+        {/* Soft elegant vignette / inner radial shadow */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_65%,rgba(0,0,0,0.02))] pointer-events-none" />
+        
+        {/* Emblem scale constraint */}
+        <div className={`${isTiny ? 'w-[90%] h-[90%]' : 'w-[72%] h-[72%]'} flex items-center justify-center`}>
+          {renderEmblem()}
+        </div>
+        
+        {/* Underlay brand text inside the tile - hide if too tiny */}
+        {!isTiny && (
+          <div className="flex flex-col items-center leading-none mt-[1px] select-none text-center w-full">
+            <span 
+              className="text-[6.5px] font-black tracking-[0.12em] text-[#705020] uppercase"
+              style={{ fontFamily: "'Libre Baskerville', serif" }}
+            >
+              DEVA
+            </span>
+            <span 
+              className="text-[4.5px] font-bold tracking-[0.18em] text-[#8e6e3c] uppercase"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              PITHI
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // If full brand layout is requested (horizontal layout with text)
   if (variant === 'full') {
     return (
-      <div className={`flex items-center gap-3.5 ${className}`}>
+      <div className={`flex items-center gap-3 ${className}`}>
         <div className={sizeMap[size] || 'w-10 h-10'}>
-          {renderEmblem()}
+          {renderTile()}
         </div>
-        <div className="flex flex-col select-none">
-          <span 
-            className="font-bold text-xl tracking-[0.15em] font-serif bg-gradient-to-r from-amber-600 via-amber-700 to-amber-900 bg-clip-text text-transparent transform hover:scale-[1.02] transition-transform duration-300"
-            style={{ fontFamily: "'Libre Baskerville', serif" }}
-          >
-            DEVA PITHI
-          </span>
-          <span className="text-[9px] text-rose-650 font-black tracking-[0.25em] uppercase leading-none mt-0.5">
-            មាំមួន • រុងរឿង • ជោគជ័យ
-          </span>
-        </div>
+        <span 
+          className="font-bold text-xl tracking-[0.08em] text-slate-900 select-none"
+          style={{ fontFamily: "'Libre Baskerville', serif" }}
+        >
+          PITHI
+        </span>
       </div>
     );
   }
@@ -202,12 +231,12 @@ export const Logo: React.FC<LogoProps> = ({
         {/* Embrossed Backdrop Container if requested */}
         <div className={`p-4 ${withBackground ? 'bg-amber-50/40 backdrop-blur-sm border border-amber-100/60 rounded-3xl shadow-xl shadow-amber-900/5 mb-4' : 'mb-3'}`}>
           <div className={sizeMap[size] || 'w-24 h-24'}>
-            {renderEmblem()}
+            {renderTile()}
           </div>
         </div>
         <div className="space-y-1 select-none">
           <h1 
-            className="text-4xl font-extrabold tracking-[0.12em] font-serif text-slate-900 leading-none"
+            className="text-4xl font-extrabold tracking-[0.12em] text-slate-900 leading-none"
             style={{ fontFamily: "'Libre Baskerville', serif" }}
           >
             DEVA PITHI
@@ -221,10 +250,10 @@ export const Logo: React.FC<LogoProps> = ({
     );
   }
 
-  // Default is just icon variant
+  // Default is just icon variant containing the beautiful tile
   return (
     <div className={containerClasses}>
-      {renderEmblem()}
+      {renderTile()}
     </div>
   );
 };

@@ -228,8 +228,12 @@ export const loginWithEmailAndPassword = async (email: string, password: string)
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();
 
-    // 1. Check TEST_ACCOUNTS list
+    // 1. Check TEST_ACCOUNTS list - instantly authorize locally to provide reliable sandboxed experience with Cambodian demo content
     const matchedTest = TEST_ACCOUNTS.find(a => a.email.toLowerCase() === cleanEmail.toLowerCase());
+    if (matchedTest) {
+        console.log(`[Pithi Demo Sandbox]: Instantly authorized test account [${cleanEmail}] locally for high-performance wedding planning simulation.`);
+        return handleMockLoginFallback(matchedTest);
+    }
 
     // 2. Check local registered mock users registry
     let localMatchedUser: any = null;
@@ -251,73 +255,6 @@ export const loginWithEmailAndPassword = async (email: string, password: string)
     } catch (error: any) {
         console.warn("Supabase Email Login Warning:", error);
         
-        // AUTO-PROVISIONING / SEEDING TRIGGER ON FIRST ATTEMPT:
-        // If the credentials match a known test account and we get invalid credentials or user not found, 
-        // we automatically try to sign them up in their Supabase Auth instance and create the database row.
-        if (matchedTest && (
-            error.message?.includes("Invalid login credentials") || 
-            error.status === 400 || 
-            error.message?.includes("User not found")
-        )) {
-            console.log(`Pre-defined test account [${cleanEmail}] not found on the live Supabase instance. Attempting automatic sandbox auto-provisioning...`);
-            try {
-                // 1. Register Auth User
-                const signUpResult = await supabase.auth.signUp({
-                    email: cleanEmail,
-                    password: cleanPassword,
-                    options: {
-                        data: {
-                            full_name: matchedTest.name,
-                            avatar_url: matchedTest.avatarUrl
-                        }
-                    }
-                });
-                
-                if (signUpResult.error) throw signUpResult.error;
-                
-                // 2. Insert Profile directly inside public.users (bypassing the selection screen for preset roles)
-                if (signUpResult.data?.user) {
-                    const uId = signUpResult.data.user.id;
-                    const newUserProfile = {
-                        id: uId,
-                        name: matchedTest.name,
-                        email: matchedTest.email,
-                        avatarUrl: matchedTest.avatarUrl,
-                        role: matchedTest.role
-                    };
-                    
-                    const { error: profileError } = await supabase
-                        .from('users')
-                        .upsert(newUserProfile);
-                        
-                    if (profileError) {
-                        console.warn("Auto-provisioning: Failed to insert public.users profile row:", profileError);
-                    } else {
-                        console.log(`Auto-provisioning: Successfully created profile role [${matchedTest.role}] for ${cleanEmail}`);
-                    }
-                }
-                
-                // 3. Retry authenticating
-                const retrySession = await supabase.auth.signInWithPassword({
-                    email: cleanEmail,
-                    password: cleanPassword
-                });
-                if (retrySession.error) throw retrySession.error;
-                return retrySession.data;
-
-            } catch (autoRegError: any) {
-                console.warn("Interactive Auto-provisioning failed or was blocked by layout. Falling back to local memory simulation.", autoRegError);
-                // Fail-safe fallback to mock login if they don't have database connection or it's restricted
-                return handleMockLoginFallback(matchedTest);
-            }
-        }
-        
-        // If any test account still fails (e.g., Supabase credentials not configured in development environment)
-        if (matchedTest) {
-            console.log("Supabase API calls failed. Initiating standard client mock session as fallback...");
-            return handleMockLoginFallback(matchedTest);
-        }
-
         // If it's a locally registered mock user
         if (localMatchedUser && localMatchedUser.password === cleanPassword) {
             console.log("Supabase API calls failed for locally registered user. Initializing local session...");

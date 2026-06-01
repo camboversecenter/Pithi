@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { completeRegistration, getPendingUser, logout } from '../services/authService';
 import { UserRole } from '../types';
 import { ShieldCheck, Heart, ChefHat, Music, Home, Sparkles, AlertTriangle, Check } from 'lucide-react';
+import { Logo } from '../components/Logo';
 
 const RoleSelection = () => {
     const navigate = useNavigate();
@@ -53,6 +54,7 @@ const RoleSelection = () => {
                 {/* Sidebar Info */}
                 <div className="md:w-1/3 bg-slate-900 p-8 text-white flex flex-col justify-between">
                     <div>
+                        <Logo variant="icon" size="md" className="mb-6 justify-start" />
                         <h2 className="text-2xl font-bold font-serif mb-4">ការជ្រើសរើសតួនាទី</h2>
                         <p className="text-slate-300 text-sm mb-6 leading-relaxed">
                             សួស្តី <strong>{pendingUser.name}</strong>,<br/><br/>

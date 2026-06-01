@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { loginUser, loginWithEmailAndPassword, registerWithEmailAndPassword } from '../services/authService';
 import { supabase } from '../services/supabaseConfig';
+import { Logo } from '../components/Logo';
 import { 
   Shield, 
   BookOpen, 
   AlertCircle, 
-  Sparkles, 
   Info, 
   Send, 
   Mail, 
@@ -138,19 +138,17 @@ const Login = () => {
 
             {/* Content */}
             <div className="relative z-10 flex flex-col justify-between h-full p-16 text-white w-full">
-                <div className="flex items-center gap-3 opacity-90">
-                    <div className="w-9 h-9 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center">
-                        <Sparkles size={18} className="text-rose-200" fill="currentColor"/>
-                    </div>
-                    <span className="font-bold text-xl tracking-widest font-serif text-white">PITHI</span>
+                <div className="flex items-center gap-3 opacity-95">
+                    <Logo variant="icon" size="sm" />
+                    <span className="font-extrabold text-xl tracking-[0.14em] font-serif text-amber-100" style={{ fontFamily: "'Libre Baskerville', serif" }}>DEVA PITHI</span>
                 </div>
 
-                <div className="max-w-xl">
+                <div className="max-w-xl font-sans">
                     <h2 className="text-5xl font-serif font-bold leading-tight mb-6 text-white tracking-tight">
                         រៀបចំពិធីដ៏មានន័យ<br/>ជាមួយភាពងាយស្រួល
                     </h2>
-                    <div className="h-1.5 w-20 bg-rose-500 mb-6 rounded-full"></div>
-                    <p className="text-rose-100/90 text-lg leading-relaxed font-light">
+                    <div className="h-1.5 w-20 bg-amber-500 mb-6 rounded-full"></div>
+                    <p className="text-amber-55/90 text-lg leading-relaxed font-light">
                       រៀបចំពិធីមង្គលការ បុណ្យខួបកំណើត ឬព្រឹត្តិការណ៍នានាប្រកបដោយជំនាញ។ ភ្ជាប់ទំនាក់ទំនងរវាងអ្នករៀបចំកម្មវិធី ម្ចាស់ពិធី និងអ្នកផ្តល់សេវាកម្មដ៏ល្អបំផុតនៅក្នុងប្រទេសកម្ពុជា។
                     </p>
                     <p className="text-rose-200/70 text-sm mt-4 font-light italic">
@@ -170,14 +168,8 @@ const Login = () => {
             <div className="w-full max-w-md space-y-6 animate-fade-in pr-1">
                 
                 {/* LOGO TEXT HEADER */}
-                <div className="flex flex-col items-center text-center space-y-3 pt-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-rose-500 to-rose-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-rose-100 mb-1 transform hover:scale-105 transition-transform duration-500">
-                        <Sparkles size={32} fill="currentColor" />
-                    </div>
-                    <div>
-                        <h1 className="text-4xl font-black font-serif text-slate-950 tracking-widest leading-none">PITHI</h1>
-                        <p className="text-rose-500 text-[10px] font-black tracking-[0.3em] uppercase mt-1.5">Ceremony Platform</p>
-                    </div>
+                <div className="pt-4 flex justify-center">
+                    <Logo variant="full-vertical" size="lg" withBackground={true} className="pb-1" />
                 </div>
 
                 {/* Banner Status */}

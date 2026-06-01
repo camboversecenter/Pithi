@@ -16,7 +16,6 @@ export const uploadImage = async (file: File, folder: 'services' | 'ceremonies' 
 
     // If using the Local Mock Fallback User, bypass Supabase storage upload entirely and use base64 for absolute convenience
     if (localStorage.getItem('pithi_mock_user')) {
-        console.log("Mock session active. Offloading image upload to client-side Base64 Data URL.");
         return await readAsDataURL(file);
     }
 

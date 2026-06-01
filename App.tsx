@@ -4,6 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate, useLocation, Link } from
 import { User, UserRole } from './types';
 import { getCurrentUser, logout, subscribe, isRegistrationPending } from './services/authService';
 import { GlobalDialogProvider } from './contexts/GlobalDialogContext';
+import { Logo } from './components/Logo';
 
 // Pages
 import Login from './pages/Login';
@@ -23,7 +24,7 @@ import CommunityLicense from './pages/CommunityLicense';
 import SocialFeed from './pages/SocialFeed';
 
 // Icons
-import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Sparkles, Home, Briefcase, MessageSquare, Send } from 'lucide-react';
+import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send } from 'lucide-react';
 
 const PrivateRoute = ({ children }: { children?: React.ReactNode }) => {
   const user = getCurrentUser();
@@ -94,13 +95,8 @@ const DesktopSidebar = ({ user, activePath, onLogout }: { user: User, activePath
     return (
         <aside className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-slate-200 z-30">
             {/* Header */}
-            <div className="flex items-center gap-3 p-6 h-20 border-b border-slate-100">
-                <div className="w-8 h-8 bg-gradient-to-br from-rose-500 to-rose-700 rounded-lg flex items-center justify-center text-white shadow-sm shadow-rose-200">
-                    <Sparkles size={16} fill="currentColor" />
-                </div>
-                <div>
-                    <h1 className="text-xl font-bold font-serif text-slate-800 tracking-tight">PITHI</h1>
-                </div>
+            <div className="flex items-center p-6 h-20 border-b border-slate-100">
+                <Logo variant="full" size="sm" />
             </div>
 
             {/* Nav */}
@@ -200,13 +196,8 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
         <div className="min-h-screen bg-slate-50 pb-20 md:pb-0 md:pl-64 transition-all duration-300">
             <DesktopSidebar user={user} activePath={location.pathname} onLogout={handleLogout} />
             
-            <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white/90 backdrop-blur-md z-40 border-b border-slate-200 flex items-center justify-between px-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-gradient-to-br from-rose-500 to-rose-700 rounded-md flex items-center justify-center text-white shadow-sm">
-                        <Sparkles size={14} fill="currentColor" />
-                    </div>
-                    <span className="font-bold font-serif text-lg text-slate-800 tracking-tight">PITHI</span>
-                </div>
+            <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-md z-40 border-b border-slate-200 flex items-center justify-between px-4">
+                <Logo variant="full" size="sm" />
                 <div className="flex items-center gap-3">
                     <Link to="/guide">
                         <BookOpen size={20} className="text-slate-400" />
@@ -229,7 +220,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 const App = () => {
   return (
     <GlobalDialogProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
             <Route path="/login" element={<Layout><Login /></Layout>} />
             <Route path="/select-role" element={<Layout><RoleSelection /></Layout>} />

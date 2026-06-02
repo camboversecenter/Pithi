@@ -158,18 +158,25 @@ const Marketplace = () => {
   const handleSubmitReview = async () => {
       if (!selectedServiceForReview || !user) return;
       setIsSubmittingReview(true);
-      const newReview = await addReview({
-          serviceId: selectedServiceForReview.id,
-          userId: user.id,
-          userName: user.name,
-          rating: newReviewRating,
-          comment: newReviewComment
-      });
-      
-      setReviews([...reviews, newReview]);
-      setNewReviewComment('');
-      setNewReviewRating(5);
-      setIsSubmittingReview(false);
+      try {
+          const newReview = await addReview({
+              serviceId: selectedServiceForReview.id,
+              userId: user.id,
+              userName: user.name,
+              rating: newReviewRating,
+              comment: newReviewComment
+          });
+          
+          setReviews([...reviews, newReview]);
+          setNewReviewComment('');
+          setNewReviewRating(5);
+          setSelectedServiceForReview(null);
+          await showAlert("ជោគជ័យ", "មតិយោបល់របស់អ្នកត្រូវបានរក្សាទុកដោយជោគជ័យ។", "success");
+      } catch (error: any) {
+          await showAlert("បរាជ័យ", error.message || "មិនអាចផ្ញើមតិយោបល់បានឡើយ។", "danger");
+      } finally {
+          setIsSubmittingReview(false);
+      }
   };
 
   const roleLabels: {[key: string]: string} = {

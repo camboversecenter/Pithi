@@ -7,6 +7,7 @@ import { CalendarView, Badge, Modal } from '../components/UIComponents';
 import { CalendarCheck, List, Sparkles, CheckSquare, ArrowRight, Mail, Briefcase, Wallet, Loader2, Calendar } from 'lucide-react';
 import { getMyInvitations, respondToInvitation, getUserCalendarEvents, getBookings, getCeremonies, getRecentActivities } from '../services/dataService';
 import { chatWithAI } from '../services/geminiService';
+import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 declare global {
   interface Window {
@@ -18,6 +19,7 @@ declare global {
 const Dashboard = () => {
   const user = getCurrentUser();
   const navigate = useNavigate();
+  const { showAlert } = useGlobalDialog();
   
   // State
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -116,9 +118,14 @@ const Dashboard = () => {
   }
 
   const handleResponse = async (guestId: string, status: GuestStatus) => {
-      await respondToInvitation(guestId, status);
-      loadInvitations();
-      loadCalendar();
+      try {
+          await respondToInvitation(guestId, status);
+          loadInvitations();
+          loadCalendar();
+          await showAlert("ជោគជ័យ", "បានកត់ត្រាការឆ្លើយតបរបស់អ្នកដោយជោគជ័យ។", "success");
+      } catch (error: any) {
+          await showAlert("បរាជ័យ", error.message || "មិនអាចផ្ញើការឆ្លើយតបបានឡើយ។", "danger");
+      }
   }
 
   if (!user) return null;

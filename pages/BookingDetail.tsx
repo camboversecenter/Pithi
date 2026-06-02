@@ -112,8 +112,15 @@ const BookingDetail = () => {
         }
         
         setLoading(true);
-        await updateBookingStatus(booking.id, newStatus);
-        await loadData(booking.id); // Reload all data
+        try {
+            await updateBookingStatus(booking.id, newStatus);
+            await loadData(booking.id); // Reload all data
+            await showAlert("ជោគជ័យ", "ស្ថានភាពការកក់ត្រូវបានអាប់ដេតដោយជោគជ័យ។", "success");
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចអាប់ដេតស្ថានភាពបានឡើយ។", "danger");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDelete = async () => {

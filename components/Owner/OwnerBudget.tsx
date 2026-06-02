@@ -25,38 +25,60 @@ const OwnerBudget: React.FC<OwnerBudgetProps> = ({ ceremony, transactions, pendi
     const balance = income - expense;
 
     const handleConfirmReport = async (report: ReportedTransaction) => {
-        await confirmReportedTransaction(report.id);
-        onRefresh();
-        await showAlert("ជោគជ័យ", "បានទទួល និងកត់ត្រាចូលបញ្ជីថវិកា។", "success");
+        try {
+            await confirmReportedTransaction(report.id);
+            onRefresh();
+            await showAlert("ជោគជ័យ", "បានទទួល និងកត់ត្រាចូលបញ្ជីថវិកា។", "success");
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចទទួលយកការរាយការណ៍បានទេ។", "danger");
+        }
     };
 
     const handleRejectReport = async (report: ReportedTransaction) => {
         const confirm = await showConfirm("បដិសេធ?", "តើអ្នកចង់លុបសំណើនេះមែនទេ?", "danger");
         if (confirm) {
-            await rejectReportedTransaction(report.id);
-            onRefresh();
+            try {
+                await rejectReportedTransaction(report.id);
+                onRefresh();
+                await showAlert("ជោគជ័យ", "បានច្រានចោលសំណើដោយជោគជ័យ។", "success");
+            } catch (error: any) {
+                await showAlert("បរាជ័យ", error.message || "មិនអាចច្រានចោលសំណើបានឡើយ។", "danger");
+            }
         }
     };
 
     const handleAddTx = async () => {
         if(!newTx.amount) return;
-        await addTransaction({
-            ceremonyId: ceremony.id, 
-            amount: Number(newTx.amount), 
-            type: newTx.type as any, 
-            category: newTx.category, 
-            date: new Date().toISOString(), 
-            expenseName: newTx.description
-        });
-        setIsTxModalOpen(false);
-        // Reset to defaults
-        setNewTx({ description: '', amount: '', type: 'INCOME', category: 'Gift' });
-        onRefresh();
+        try {
+            await addTransaction({
+                ceremonyId: ceremony.id, 
+                amount: Number(newTx.amount), 
+                type: newTx.type as any, 
+                category: newTx.category, 
+                date: new Date().toISOString(), 
+                expenseName: newTx.description
+            });
+            setIsTxModalOpen(false);
+            // Reset to defaults
+            setNewTx({ description: '', amount: '', type: 'INCOME', category: 'Gift' });
+            onRefresh();
+            await showAlert("ជោគជ័យ", "ប្រាក់ចំណូល/ចំណាយ ត្រូវបានបន្ថែមដោយជោគជ័យ។", "success");
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចបន្ថែមប្រតិបត្តិការឡើយ។", "danger");
+        }
     };
 
     const handleDeleteTx = async (id: string) => {
-        await deleteTransaction(id);
-        onRefresh();
+        const confirm = await showConfirm("លុបប្រតិបត្តិការ?", "តើអ្នកចង់លុបប្រតិបត្តិការនេះពីបញ្ជីថវិកាមែនទេ?", "danger");
+        if (confirm) {
+            try {
+                await deleteTransaction(id);
+                onRefresh();
+                await showAlert("ជោគជ័យ", "ប្រតិបត្តិការត្រូវបានលុប។", "success");
+            } catch (error: any) {
+                await showAlert("បរាជ័យ", error.message || "មិនអាចលុបប្រតិបត្តិការបានឡើយ។", "danger");
+            }
+        }
     };
 
     return (

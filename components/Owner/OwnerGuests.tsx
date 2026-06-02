@@ -15,7 +15,7 @@ interface OwnerGuestsProps {
 }
 
 const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, currentUser }) => {
-    const { showAlert } = useGlobalDialog();
+    const { showAlert, showConfirm } = useGlobalDialog();
 
     // Guest List Management State
     const [guestSearch, setGuestSearch] = useState('');
@@ -66,15 +66,28 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
 
     const handleAddGuest = async () => {
         if(!newGuest.name) return;
-        await addGuest({ceremonyId: ceremony.id, ...newGuest});
-        setIsGuestModalOpen(false);
-        setNewGuest({name:'', phoneNumber:'', guestType:'General'});
-        onRefresh();
+        try {
+            await addGuest({ceremonyId: ceremony.id, ...newGuest});
+            setIsGuestModalOpen(false);
+            setNewGuest({name:'', phoneNumber:'', guestType:'General'});
+            onRefresh();
+            await showAlert("ជោគជ័យ", "ភ្ញៀវត្រូវបានបន្ថែមដោយជោគជ័យ។", "success");
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចបន្ថែមភ្ញៀវបានឡើយ។", "danger");
+        }
     };
 
     const handleDeleteGuest = async (id: string) => {
-        await deleteGuest(id);
-        onRefresh();
+        const confirm = await showConfirm("លុបឈ្មោះភ្ញៀវ?", "តើអ្នកប្រាកដជាចង់លុបភ្ញៀវនេះចេញពីបញ្ជីមែនទេ?", "danger");
+        if (confirm) {
+            try {
+                await deleteGuest(id);
+                onRefresh();
+                await showAlert("ជោគជ័យ", "ភ្ញៀវត្រូវបានលុបដោយជោគជ័យ។", "success");
+            } catch (error: any) {
+                await showAlert("បរាជ័យ", error.message || "មិនអាចលុបឈ្មោះភ្ញៀវបានឡើយ។", "danger");
+            }
+        }
     };
 
     // Copy Logic

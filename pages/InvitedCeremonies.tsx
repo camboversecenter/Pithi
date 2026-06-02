@@ -83,10 +83,15 @@ const InvitedCeremonies = () => {
 
     const handleRSVP = async (status: GuestStatus) => {
         if (selectedInvitation) {
-            await respondToInvitation(selectedInvitation.id, status);
-            setSelectedInvitation({...selectedInvitation, status: status});
-            // Update List cache if needed
-            loadList(activeTab, page);
+            try {
+                await respondToInvitation(selectedInvitation.id, status);
+                setSelectedInvitation({...selectedInvitation, status: status});
+                // Update List cache if needed
+                loadList(activeTab, page);
+                await showAlert("ជោគជ័យ", "បានកត់ត្រាការឆ្លើយតបរបស់អ្នកដោយជោគជ័យ។", "success");
+            } catch (error: any) {
+                await showAlert("បរាជ័យ", error.message || "មិនអាចផ្ញើការឆ្លើយតបបានឡើយ។", "danger");
+            }
         }
     };
 

@@ -16,7 +16,7 @@ interface OwnerInvitationsProps {
 }
 
 const OwnerInvitations: React.FC<OwnerInvitationsProps> = ({ ceremony, templates, onRefresh, currentUser }) => {
-    const { showAlert } = useGlobalDialog();
+    const { showAlert, showConfirm } = useGlobalDialog();
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [newTemplate, setNewTemplate] = useState({ type: 'General', message: '', bannerUrl: '', expirationDate: '' });
     const [templateBannerFile, setTemplateBannerFile] = useState<File | null>(null);
@@ -65,14 +65,25 @@ const OwnerInvitations: React.FC<OwnerInvitationsProps> = ({ ceremony, templates
             setNewTemplate({ type: 'General', message: '', bannerUrl: '', expirationDate: '' });
             setTemplateBannerFile(null);
             onRefresh();
+            await showAlert("ជោគជ័យ", "រក្សាទុកគំរូធៀបការដោយជោគជ័យ។", "success");
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចរក្សាទុកបានឡើយ។", "danger");
         } finally {
             setIsSavingTemplate(false);
         }
     };
 
     const handleDeleteTemplate = async (t: InvitationTemplate) => {
-        await deleteInvitationTemplate(t.id);
-        onRefresh();
+        const confirm = await showConfirm("លុបគំរូធៀបការ?", "តើអ្នកប្រាកដជាចង់លុបគំរូធៀបការនេះមែនទេ?", "danger");
+        if (confirm) {
+            try {
+                await deleteInvitationTemplate(t.id);
+                onRefresh();
+                await showAlert("ជោគជ័យ", "បានលុបគំរូធៀបការដោយជោគជ័យ។", "success");
+            } catch (error: any) {
+                await showAlert("បរាជ័យ", error.message || "មិនអាចលុបបានឡើយ។", "danger");
+            }
+        }
     };
 
     return (

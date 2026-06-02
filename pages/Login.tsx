@@ -31,6 +31,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showGoogleHelp, setShowGoogleHelp] = useState(false);
 
   useEffect(() => {
     if (supabase) {
@@ -312,6 +313,35 @@ const Login = () => {
                     ) : (
                         <div className="w-full py-3 border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 text-xs bg-slate-50">
                             Connecting to Service...
+                        </div>
+                    )}
+
+                    <div className="text-center pt-1">
+                        <button 
+                            type="button"
+                            onClick={() => setShowGoogleHelp(!showGoogleHelp)}
+                            className="text-[11px] text-rose-600 hover:text-rose-700 font-bold underline transition-colors"
+                        >
+                            ជួបបញ្ហាជាមួយ Google Sign-In? (Having issues with Google Sign-In?)
+                        </button>
+                    </div>
+
+                    {showGoogleHelp && (
+                        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-left text-xs text-slate-700 space-y-2.5 animate-fade-in font-medium">
+                            <p className="font-bold text-slate-900 border-b pb-1">របៀបដោះស្រាយបញ្ហា Google Sign-In 403 (Troubleshooting Guide):</p>
+                            <p className="text-[11px] leading-relaxed text-slate-600">
+                                បញ្ហា <strong>"Access blocked: Pithi can only be used within its organization" (Error 403: org_internal)</strong> កើតឡើងដោយសារស្ថិតិកម្រិតគម្រោង Google Cloud របស់លោកអ្នកកំណត់ជា <strong>Internal</strong>។
+                            </p>
+                            <p className="font-semibold text-slate-800">សូមអនុវត្តតាមជំហានខាងក្រោមដើម្បីកែសម្រួល៖</p>
+                            <ol className="list-decimal pl-4 space-y-2 text-[11px] leading-relaxed text-slate-600">
+                                <li>ចូលទៅកាន់ <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-bold">Google Cloud Console</a> ហើយជ្រើសរើស Project របស់អ្នក។</li>
+                                <li>ទៅកាន់ម៉ឺនុយ <strong>APIs & Services</strong> &gt; <strong>OAuth consent screen</strong>។</li>
+                                <li>នៅក្រោមផ្នែក <strong>User Type</strong> សូមចុចលើពាក្យ <strong>"MAKE EXTERNAL"</strong> ដើម្បីអនុញ្ញាតឱ្យគណនីជុំវិញពិភពលោក (@gmail.com) អាចចូលប្រើបាន។</li>
+                                <li>ប្រសិនបើស្ថិតិជា <strong>Testing</strong> សូមបន្ថែមអ៊ីមែលរបស់អ្នក (ឧ. <code className="bg-slate-200 px-1 rounded text-rose-700 font-bold">pithi.deva@gmail.com</code>) ទៅក្នុងបញ្ជី <strong>Test users</strong>។</li>
+                            </ol>
+                            <div className="pt-1.5 border-t text-[10px] text-slate-500 leading-relaxed italic">
+                                *កំណត់ចំណាំ៖ សូមប្រាកដថាបានបំពេញ Authorized Redirect URI នៅក្នុង Google Cloud Console ឱ្យត្រូវគ្នាជាមួយ Supabase Callback URL របស់គម្រោងអ្នក (ឧ. <code className="bg-slate-150 p-0.5 rounded font-mono break-all font-bold">https://fioumbuhowumfjptjzfy.supabase.co/auth/v1/callback</code>)។
+                            </div>
                         </div>
                     )}
                 </div>

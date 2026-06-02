@@ -13,7 +13,7 @@ export default defineConfig(() => {
           enabled: true,
           type: 'module',
         },
-        includeAssets: ['favicon.png', 'offline.html', 'icons/*'],
+        includeAssets: ['favicon.png', 'icons/*'],
         manifest: {
           name: 'ពិធី - PITHI Ceremony Planner',
           short_name: 'PITHI',
@@ -47,7 +47,7 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,jpg,jpeg}'],
-          navigateFallback: '/offline.html',
+          navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api/, /supabase/],
           runtimeCaching: [
             {

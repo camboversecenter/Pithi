@@ -16,7 +16,7 @@ export const Logo: React.FC<LogoProps> = ({
   // Dimensions map
   const sizeMap = {
     xs: 'w-6 h-6',
-    sm: 'w-8 h-8',
+    sm: 'w-10 h-10', // Enhanced to 40px for beautiful legibility of the "DEVA PITHI" mark inside the tile
     md: 'w-12 h-12',
     lg: 'w-16 h-16',
     xl: 'w-24 h-24',
@@ -53,9 +53,9 @@ export const Logo: React.FC<LogoProps> = ({
 
         {/* Elegant Deep Teal & Ocean Blue */}
         <linearGradient id="tealGradient" x1="50" y1="30" x2="110" y2="90" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#317A9B" />
-          <stop offset="50%" stopColor="#1E526D" />
-          <stop offset="100%" stopColor="#102C40" />
+          <stop offset="0%" stopColor="#2D6F8C" />
+          <stop offset="50%" stopColor="#1B475E" />
+          <stop offset="100%" stopColor="#0F2B3B" />
         </linearGradient>
 
         {/* Drop Shadow for overlay depth */}
@@ -97,7 +97,7 @@ export const Logo: React.FC<LogoProps> = ({
         />
       </g>
 
-      {/* BASE GOLD LAYER SHIELD (Geometric V-anchor pointing down, representing foundation/Pithi) */}
+      {/* BASE GOLD LAYER SHIELD (Geometric V-anchor pointing down) */}
       <path
         d="M38,55 L58,98 L78,55 L68,55 L58,82 L48,55 Z"
         fill="url(#goldGradient)"
@@ -129,7 +129,7 @@ export const Logo: React.FC<LogoProps> = ({
         />
         <circle cx="37" cy="55" r="4.5" fill="url(#goldGradient)" />
 
-        {/* Khmer Ornate Scroll Sprout (Phni Tes leaf curling) */}
+        {/* Khmer Ornate Scroll Sprout */}
         <path
           d="M33,52 C27,45 28,34 37,30 C45,26 50,34 46,42 C44,46 39,47 37,44 C35,41 38,37 41,37 C43,37 44.5,40 42,43 C39,46 35,44 35,41"
           fill="none"
@@ -138,7 +138,7 @@ export const Logo: React.FC<LogoProps> = ({
           strokeLinecap="round"
         />
 
-        {/* Rising Graceful Central Flame (Kbach Motif soaring up) */}
+        {/* Rising Graceful Central Flame */}
         <path
           d="M58,90 C50,80 43,72 45,60 C47,48 57,42 55,25 C54,18 48,15 48,8 C53,8 57,14 59,21 C62.5,31 59,38 65,46 C70,52 68,58 63,70 C59,79 61,85 58,90 Z"
           fill="url(#kbachGold)"
@@ -174,35 +174,62 @@ export const Logo: React.FC<LogoProps> = ({
   );
 
   // A helper to render the beautiful beige/cream tile box containing the emblem and the "DEVA PITHI" name below it
-  const renderTile = () => {
+  const renderSvgFallback = () => {
     const isTiny = size === 'xs';
     return (
-      <div className="relative flex flex-col items-center justify-center bg-gradient-to-br from-[#faf4e8] via-[#Fbf6ec] to-[#decdae] border border-[#cfbe9d] shadow-[0_2px_8px_rgba(80,50,15,0.06)] rounded-lg p-0.5 overflow-hidden w-full h-full">
+      <div className="relative flex flex-col items-center justify-center bg-gradient-to-br from-[#faf4e8] via-[#Fbf6ec] to-[#decdae] w-full h-full">
         {/* Soft elegant vignette / inner radial shadow */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_65%,rgba(0,0,0,0.02))] pointer-events-none" />
         
         {/* Emblem scale constraint */}
-        <div className={`${isTiny ? 'w-[90%] h-[90%]' : 'w-[72%] h-[72%]'} flex items-center justify-center`}>
+        <div className={`${isTiny ? 'w-[90%] h-[90%]' : 'w-[70%] h-[70%]'} flex items-center justify-center`}>
           {renderEmblem()}
         </div>
         
         {/* Underlay brand text inside the tile - hide if too tiny */}
         {!isTiny && (
-          <div className="flex flex-col items-center leading-none mt-[1px] select-none text-center w-full">
+          <div className="flex flex-col items-center leading-none mt-0.5 select-none text-center w-full px-1">
             <span 
-              className="text-[6.5px] font-black tracking-[0.12em] text-[#705020] uppercase"
-              style={{ fontFamily: "'Libre Baskerville', serif" }}
+              className="text-[6.5px] font-black tracking-[0.14em] text-[#715222] uppercase"
+              style={{ fontFamily: "'Libre Baskerville', serif, system-ui" }}
             >
               DEVA
             </span>
             <span 
-              className="text-[4.5px] font-bold tracking-[0.18em] text-[#8e6e3c] uppercase"
+              className="text-[4px] font-extrabold tracking-[0.1em] text-[#8e6e3c] uppercase flex items-center justify-center gap-[3px] w-full mt-[1px]"
               style={{ fontFamily: "'Inter', sans-serif" }}
             >
+              <span className="h-[0.5px] w-1.5 bg-[#8e6e3c]/35"></span>
               PITHI
+              <span className="h-[0.5px] w-1.5 bg-[#8e6e3c]/35"></span>
             </span>
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderTile = () => {
+    return (
+      <div className="relative overflow-hidden w-full h-full rounded-lg bg-[#f0e6d2] border border-[#cfbe9d] shadow-[0_2px_8px_rgba(80,50,15,0.06)] transition-transform duration-500 hover:scale-105 flex items-center justify-center">
+        <img 
+          src="/src/assets/images/logo_pith_deva.jpg" 
+          alt="Deva Pithi" 
+          className="w-full h-full object-cover block"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            // SVG Fallback if image fails to load (e.g. static assets building path changes)
+            e.currentTarget.style.display = 'none';
+            const fallbackElem = document.getElementById(`logo-fallback-${size}`);
+            if (fallbackElem) {
+              fallbackElem.style.display = 'block';
+            }
+          }}
+        />
+        {/* SVG Fallback Container */}
+        <div id={`logo-fallback-${size}`} style={{ display: 'none' }} className="w-full h-full absolute inset-0">
+          {renderSvgFallback()}
+        </div>
       </div>
     );
   };

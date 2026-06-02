@@ -5,6 +5,8 @@ import { User, UserRole } from './types';
 import { getCurrentUser, logout, subscribe, isRegistrationPending } from './services/authService';
 import { GlobalDialogProvider } from './contexts/GlobalDialogContext';
 import { Logo } from './components/Logo';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 
 // Pages
 import Login from './pages/Login';
@@ -239,6 +241,8 @@ const App = () => {
             <Route path="/booking/:id" element={<Layout><PrivateRoute><BookingDetail /></PrivateRoute></Layout>} />
         </Routes>
         </Router>
+        <PWAInstallPrompt />
+        <PWAUpdateNotification />
     </GlobalDialogProvider>
   );
 };

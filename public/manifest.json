@@ -1,0 +1,31 @@
+{
+  "name": "ពិធី - PITHI Ceremony Planner",
+  "short_name": "PITHI",
+  "description": "A comprehensive ceremony management platform connecting organizers, owners, and vendors for seamless event planning.",
+  "theme_color": "#be123c",
+  "background_color": "#f8fafc",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

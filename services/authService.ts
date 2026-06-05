@@ -224,6 +224,82 @@ export const loginUser = async (): Promise<{ status: 'SUCCESS' | 'NEEDS_ROLE', u
     }
 };
 
+export const simulateGoogleLogin = async (email: string, name: string = ''): Promise<{ status: 'SUCCESS' | 'NEEDS_ROLE', user?: any }> => {
+    const cleanEmail = email.trim();
+    const displayName = name || cleanEmail.split('@')[0] || 'Google User';
+    const avatarUrl = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(displayName)}`;
+
+    const mockGoogleUser = {
+        id: crypto.randomUUID ? crypto.randomUUID() : `google-id-${Date.now()}`,
+        email: cleanEmail,
+        name: displayName,
+        avatarUrl: avatarUrl,
+        provider: 'google'
+    };
+
+    // Try to get profile from Supabase first
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', cleanEmail)
+            .single();
+
+        if (!error && data) {
+            const userWithRole: User = {
+                id: data.id,
+                name: data.name,
+                email: data.email,
+                avatarUrl: data.avatarUrl || avatarUrl,
+                role: data.role as UserRole
+            };
+            localStorage.setItem('pithi_mock_user', JSON.stringify(userWithRole));
+            setCurrentUser(userWithRole);
+            return { status: 'SUCCESS', user: userWithRole };
+        }
+    } catch (e) {
+        console.warn("Simulation Database Fetch Failed, using local matching:", e);
+    }
+
+    // Check if user exists in test accounts
+    const matchedTest = TEST_ACCOUNTS.find(a => a.email.toLowerCase() === cleanEmail.toLowerCase());
+    if (matchedTest) {
+        const fallbackRes = handleMockLoginFallback(matchedTest);
+        return { status: 'SUCCESS', user: fallbackRes.user };
+    }
+
+    // Check local registered accounts
+    try {
+        const savedUsersJson = localStorage.getItem('pithi_local_registered_users') || '[]';
+        const savedUsers = JSON.parse(savedUsersJson);
+        const localMatchedUser = savedUsers.find((u: any) => u.email === cleanEmail.toLowerCase());
+        if (localMatchedUser && localMatchedUser.isRoleSelected !== false) {
+            const userWithRole: User = {
+                id: localMatchedUser.id,
+                name: localMatchedUser.name,
+                email: localMatchedUser.email,
+                avatarUrl: localMatchedUser.avatarUrl || avatarUrl,
+                role: localMatchedUser.role as UserRole
+            };
+            localStorage.setItem('pithi_mock_user', JSON.stringify(userWithRole));
+            setCurrentUser(userWithRole);
+            return { status: 'SUCCESS', user: userWithRole };
+        }
+    } catch (e) {
+        console.warn("Failed to check local registered users in simulator:", e);
+    }
+
+    // Otherwise, set registration pending with role selection
+    pendingRegistrationUser = {
+        id: mockGoogleUser.id,
+        email: mockGoogleUser.email,
+        name: mockGoogleUser.name,
+        avatarUrl: mockGoogleUser.avatarUrl
+    };
+    setCurrentUser(null);
+    return { status: 'NEEDS_ROLE', user: pendingRegistrationUser };
+};
+
 export const loginWithEmailAndPassword = async (email: string, password: string): Promise<any> => {
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();

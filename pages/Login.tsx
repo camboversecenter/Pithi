@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { loginUser, loginWithEmailAndPassword, registerWithEmailAndPassword } from '../services/authService';
+import { loginUser, loginWithEmailAndPassword, registerWithEmailAndPassword, simulateGoogleLogin } from '../services/authService';
 import { supabase } from '../services/supabaseConfig';
 import { Logo } from '../components/Logo';
 import { 
@@ -16,7 +16,8 @@ import {
   EyeOff, 
   Loader2, 
   KeyRound,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 
 const Login = () => {
@@ -31,7 +32,12 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showGoogleHelp, setShowGoogleHelp] = useState(false);
+  const [showGoogleHelp, setShowGoogleHelp] = useState(true);
+
+  // Google Simulator states
+  const [useSimulator, setUseSimulator] = useState(true);
+  const [simulatorEmail, setSimulatorEmail] = useState('pithi.deva@gmail.com');
+  const [simulatorName, setSimulatorName] = useState('Pithi Deva');
 
   useEffect(() => {
     if (supabase) {
@@ -49,6 +55,30 @@ const Login = () => {
       } catch (error: any) {
           console.error(error);
           setErrorMsg("ការចូលប្រើប្រាស់បរាជ័យ។ (Google sign-in failed: " + (error.message || "Unknown error") + ")");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const handleSimulatedOAuthLogin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!simulatorEmail) {
+          setErrorMsg("សូមបញ្ចូលអ៊ីមែល Google! (Please enter a Google email!)");
+          return;
+      }
+      setIsLoading(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      try {
+          const res = await simulateGoogleLogin(simulatorEmail, simulatorName);
+          if (res.status === 'SUCCESS') {
+              setSuccessMsg("ចូលប្រើគណនី Google ក្លែងធ្វើទទួលបានជោគជ័យ! (Simulated Google login successful!)");
+          } else {
+              setSuccessMsg("គណនី Google ថ្មី! សូមជ្រើសរើសតួនាទីរបស់អ្នក។ (New Google account! Please select your role.)");
+          }
+      } catch (error: any) {
+          console.error(error);
+          setErrorMsg("ការចូលក្លែងធ្វើបរាជ័យ៖ " + (error.message || "Unknown error"));
       } finally {
           setIsLoading(false);
       }
@@ -299,21 +329,82 @@ const Login = () => {
                 </div>
 
                 {/* SOCIAL GOOGLE BUTTON */}
-                <div className="space-y-3">
-                    {supabaseConnected ? (
-                        <button 
-                            onClick={handleOAuthLogin}
-                            className="group relative w-full flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-200 shadow-sm text-xs"
-                            disabled={isLoading}
-                        >
-                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4 group-hover:scale-110 transition-transform"/>
-                            <span>ចូលជាមួយ Google (Log In with Google)</span>
-                            {isLoading && <div className="absolute right-4 w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>}
-                        </button>
+                <div className="space-y-3 font-sans">
+                    {useSimulator ? (
+                        <form onSubmit={handleSimulatedOAuthLogin} className="p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl space-y-3 animate-fade-in text-xs font-semibold text-slate-700">
+                            <div className="flex items-center justify-between">
+                                <span className="font-bold text-amber-900 flex items-center gap-1">
+                                    <Sparkles size={13} className="text-amber-600 animate-pulse" /> Google Consent Bypass Simulator
+                                </span>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setUseSimulator(false)} 
+                                    className="text-[10px] text-slate-500 hover:text-slate-800 underline font-bold"
+                                >
+                                    Use Real OAuth
+                                </button>
+                            </div>
+                            <p className="text-[10.5px] leading-relaxed text-slate-600">
+                                ដោះស្រាយបញ្ហាគណនី Google 403 ភ្លាមៗ! បញ្ចូលឈ្មោះ និង អ៊ីមែល Google របស់អ្នកដើម្បីកែតម្រូវ និងសាកល្បងដោយជោគជ័យ។ (Bypass the Google 403 error instantly by entering details below)
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] uppercase font-black text-slate-500 block">Google Name (ឈ្មោះ)</label>
+                                    <input 
+                                        type="text"
+                                        required
+                                        value={simulatorName}
+                                        onChange={(e) => setSimulatorName(e.target.value)}
+                                        placeholder="ឈ្មោះពេញរបស់អ្នក"
+                                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] uppercase font-black text-slate-500 block">Google Email (អ៊ីមែល)</label>
+                                    <input 
+                                        type="email"
+                                        required
+                                        value={simulatorEmail}
+                                        onChange={(e) => setSimulatorEmail(e.target.value)}
+                                        placeholder="yourname@gmail.com"
+                                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-800"
+                                    />
+                                </div>
+                            </div>
+                            <button 
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                                {isLoading ? <Loader2 size={12} className="animate-spin" /> : <>សាកល្បងចូលគណនី Google (Login with simulator)</>}
+                            </button>
+                        </form>
                     ) : (
-                        <div className="w-full py-3 border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 text-xs bg-slate-50">
-                            Connecting to Service...
-                        </div>
+                        supabaseConnected ? (
+                            <div className="space-y-2">
+                                <button 
+                                    onClick={handleOAuthLogin}
+                                    className="group relative w-full flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-all duration-200 shadow-sm text-xs"
+                                    disabled={isLoading}
+                                >
+                                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4 group-hover:scale-110 transition-transform"/>
+                                    <span>ចូលជាមួយ Google (Log In with Google)</span>
+                                    {isLoading && <div className="absolute right-4 w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>}
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setUseSimulator(true)}
+                                    className="w-full py-1.5 bg-amber-50 border border-dashed border-amber-200 hover:bg-amber-100/50 hover:border-amber-300 rounded-xl flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-800 text-[10px] font-black tracking-wide uppercase transition-all"
+                                >
+                                    <Sparkles size={11} className="text-amber-500" />
+                                    <span>មានបញ្ហា 403? ក្លែងចូល Google (Use Google Login Simulator)</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="w-full py-3 border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 text-xs bg-slate-50">
+                                Connecting to Service...
+                            </div>
+                        )
                     )}
 
                     <div className="text-center pt-1">

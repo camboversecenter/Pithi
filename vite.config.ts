@@ -13,7 +13,7 @@ export default defineConfig(() => {
           enabled: true,
           type: 'module',
         },
-        includeAssets: ["favicon.svg", "pwa-192x192.png", "pwa-512x512.png"],
+        includeAssets: ["favicon.png", "pwa-192x192.png", "pwa-512x512.png"],
         manifest: {
           name: 'ពិធី - PITHI Ceremony Planner',
           short_name: 'PITHI',

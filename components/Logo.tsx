@@ -213,7 +213,7 @@ export const Logo: React.FC<LogoProps> = ({
     return (
       <div className="relative overflow-hidden w-full h-full rounded-lg bg-[#f0e6d2] border border-[#cfbe9d] shadow-[0_2px_8px_rgba(80,50,15,0.06)] transition-transform duration-500 hover:scale-105 flex items-center justify-center">
         <img 
-          src="https://fioumbuhowumfjptjzfy.supabase.co/storage/v1/object/public/logo/maskable_icon_x512.png" 
+          src="https://fioumbuhowumfjptjzfy.supabase.co/storage/v1/object/public/logo/logo.png" 
           alt="Deva Pithi" 
           className="w-full h-full object-cover block"
           referrerPolicy="no-referrer"

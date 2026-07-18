@@ -39,12 +39,6 @@ For a quick project overview and setup instructions, see the
 | [database-and-security.md](database-and-security.md) | Postgres schema, helper functions, and Row-Level-Security policies |
 | [pwa-and-offline.md](pwa-and-offline.md) | Installability, offline caching, and Cloudflare Pages deployment |
 
-## Related / exploratory
-
-| Doc | What it covers |
-|-----|----------------|
-| [ksl-roadmap.md](ksl-roadmap.md) | Khmer Sign Language recognition/translation roadmap — an exploratory accessibility initiative (not part of the shipped app) |
-
 ## Roles at a glance
 
 | Role | Primary surface |

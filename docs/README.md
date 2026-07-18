@@ -19,7 +19,8 @@ For a quick project overview and setup instructions, see the
 
 | Doc | What it covers |
 |-----|----------------|
-| [authentication-and-roles.md](authentication-and-roles.md) | Sign-in options, the seven roles, role selection, session handling, route guards, navigation, and demo mode |
+| [authentication-and-roles.md](authentication-and-roles.md) | Sign-in options, the seven roles, role selection, session handling, route guards, navigation, the public landing page, and demo mode |
+| [google-signin-setup.md](google-signin-setup.md) | Supabase + Google Cloud configuration required for real Google OAuth |
 | [dashboard.md](dashboard.md) | The role-adaptive home screen and the AI chat assistant |
 | [organizer-portal.md](organizer-portal.md) | Planner workflows: ceremonies, guests, invitations, plans, owner assignment |
 | [owner-portal.md](owner-portal.md) | Host workflows and the budget/finance tab |

@@ -42,7 +42,39 @@ const Login = () => {
   useEffect(() => {
     if (supabase) {
         setSupabaseConnected(true);
-    } 
+    }
+  }, []);
+
+  // Surface OAuth errors that Google/Supabase return on the redirect URL.
+  // Without this, a failed Google sign-in (e.g. 403 org_internal, access_denied,
+  // or a redirect-URL mismatch) silently bounces the user back to a blank form.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      let errDesc = url.searchParams.get('error_description') || url.searchParams.get('error');
+
+      // Defensive: some responses put the error in the hash fragment.
+      if (!errDesc && window.location.hash.includes('error')) {
+        const frag = window.location.hash.replace(/^#\/?/, '');
+        const fragParams = new URLSearchParams(frag);
+        errDesc = fragParams.get('error_description') || fragParams.get('error');
+      }
+
+      if (errDesc) {
+        const msg = decodeURIComponent(errDesc.replace(/\+/g, ' '));
+        let friendly = 'Google sign-in failed: ' + msg;
+        if (/org_internal|access.?blocked|not.*allowed/i.test(msg)) {
+          friendly += " — សូមប្រើ Google Login Simulator ខាងក្រោម ឬកែ OAuth Consent Screen ទៅ 'External'។";
+        }
+        setErrorMsg(friendly);
+
+        // Clean the error params from the URL so it doesn't persist on refresh.
+        const cleanHash = window.location.hash && window.location.hash.startsWith('#/') ? window.location.hash : '#/login';
+        window.history.replaceState({}, document.title, url.origin + url.pathname + cleanHash);
+      }
+    } catch {
+      /* no-op */
+    }
   }, []);
 
   const handleOAuthLogin = async () => {

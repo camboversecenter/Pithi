@@ -9,6 +9,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 
 // Pages
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import RoleSelection from './pages/RoleSelection';
 import Dashboard from './pages/Dashboard';
@@ -188,11 +189,11 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
     if (!user && isRegistrationPending()) return location.pathname !== '/select-role' ? <Navigate to="/select-role" /> : <>{children}</>;
     
-    const publicPaths = ['/login', '/guide', '/community-license'];
+    const publicPaths = ['/welcome', '/login', '/guide', '/community-license'];
     const isInvitation = location.pathname.startsWith('/invitation/');
-    if (!user) return (!publicPaths.includes(location.pathname) && !isInvitation) ? <Navigate to="/login" /> : <>{children}</>;
-    
-    if (user && (location.pathname === '/login' || location.pathname === '/select-role')) return <Navigate to="/" />;
+    if (!user) return (!publicPaths.includes(location.pathname) && !isInvitation) ? <Navigate to="/welcome" /> : <>{children}</>;
+
+    if (user && (location.pathname === '/login' || location.pathname === '/select-role' || location.pathname === '/welcome')) return <Navigate to="/" />;
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20 md:pb-0 md:pl-64 transition-all duration-300">
@@ -224,6 +225,7 @@ const App = () => {
     <GlobalDialogProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
+            <Route path="/welcome" element={<Layout><Landing /></Layout>} />
             <Route path="/login" element={<Layout><Login /></Layout>} />
             <Route path="/select-role" element={<Layout><RoleSelection /></Layout>} />
             <Route path="/invitation/:id" element={<Layout><InvitationCard /></Layout>} />

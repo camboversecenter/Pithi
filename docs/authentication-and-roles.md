@@ -21,6 +21,15 @@ land in, and (server-side) what data you can touch:
 The four vendor roles are handled as a group throughout the code
 (`['CHEF','HALL','MUSIC_BAND','BEAUTY_SALON']`).
 
+## Public landing page (`pages/Landing.tsx`)
+
+The first thing a logged-out visitor sees is the public landing page at
+`/welcome` — a marketing front page with the PITHI pitch, feature highlights,
+the roles it serves, the community/free/open-source note, and calls-to-action
+into `/login`. `Layout` redirects any logged-out visit to a non-public route
+(including `/`) to `/welcome`; logged-in users hitting `/welcome` are bounced to
+the dashboard.
+
 ## Sign-in options (`pages/Login.tsx`)
 
 The login screen is deliberately a **public interactive demo** and offers four
@@ -31,7 +40,11 @@ parallel ways in:
    you back to the sign-in tab. Supabase error strings are translated to Khmer
    (invalid credentials, email already registered, password too short).
 2. **Real Google OAuth** — `supabase.auth.signInWithOAuth` with
-   `redirectTo: window.location.origin`.
+   `redirectTo: window.location.origin`. The Supabase client uses the **PKCE
+   flow** so the OAuth result comes back as a `?code=` query param rather than a
+   `#access_token` hash fragment (which would collide with the hash router).
+   Making real Google sign-in work also requires dashboard configuration —
+   see [google-signin-setup.md](google-signin-setup.md).
 3. **Google "simulator"** — a consent-bypass form (defaulting to the admin
    identity `pithi.deva@gmail.com`) for demoing the OAuth flow when a real Google
    project isn't configured. There is also an inline troubleshooting guide for

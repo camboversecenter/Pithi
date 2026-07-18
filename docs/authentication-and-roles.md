@@ -92,7 +92,7 @@ logs the user back out.
 - **`Layout` is the real guard.** It shows a spinner until auth initializes, then:
   - Pending registration → forced to `/select-role`.
   - No user on a non-public path → redirected to `/login`
-    (public paths: `/login`, `/guide`, `/community-license`, `/invitation/:id`).
+    (public paths: `/welcome`, `/login`, `/guide`, `/invitation/:id`).
   - Logged-in user on `/login` or `/select-role` → redirected to `/`.
 
 > **Note:** role-specific pages (`/organizer`, `/owner`, `/vendor`, `/admin`) are

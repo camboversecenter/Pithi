@@ -215,7 +215,6 @@ const Landing = () => {
           <Logo variant="full" size="sm" />
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             <Link to="/guide" className="text-slate-500 hover:text-slate-800 font-medium">សៀវភៅណែនាំ</Link>
-            <Link to="/community-license" className="text-slate-500 hover:text-slate-800 font-medium">អាជ្ញាប័ណ្ណ</Link>
             <Link to="/login" className="text-slate-500 hover:text-slate-800 font-medium">ចូលគណនី</Link>
             <a
               href="https://t.me/+DBOU-zZhP_lkNTg9"

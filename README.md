@@ -109,10 +109,9 @@ redistribute the code — maximizing adoption and contributions — while contri
 provide an explicit **patent grant**, and the **PITHI** and **CamboVerse** names
 stay protected as trademarks (the license grants no trademark rights).
 
-> Please ensure this aligns with any CamboVerse/NUM incubation IP terms, and
-> reconcile it with the app's in-product license page
-> (`pages/CommunityLicense.tsx`). Documentation and other non-code content may
-> additionally be offered under **CC BY 4.0**.
+> Please ensure this aligns with any CamboVerse/NUM incubation IP terms.
+> Documentation and other non-code content may additionally be offered under
+> **CC BY 4.0**.
 
 ## Incubation & acknowledgements
 

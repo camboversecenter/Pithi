@@ -42,8 +42,7 @@ most of the code you will read.
   as static files on Cloudflare Pages with no server-side routing.
 - `Layout` wraps every route. It subscribes to auth changes, shows a loading
   spinner until auth initializes, and enforces access:
-  - Public paths: `/login`, `/guide`, `/community-license`, and any
-    `/invitation/:id`.
+  - Public paths: `/welcome`, `/login`, `/guide`, and any `/invitation/:id`.
   - A pending registration (chose to sign up but hasn't picked a role) is forced
     to `/select-role`.
   - Logged-in users hitting `/login` or `/select-role` are redirected to `/`.

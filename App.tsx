@@ -23,7 +23,6 @@ import BookingDetail from './pages/BookingDetail';
 import InvitedCeremonies from './pages/InvitedCeremonies';
 import AdminDashboard from './pages/AdminDashboard';
 import UserGuide from './pages/UserGuide';
-import CommunityLicense from './pages/CommunityLicense';
 import SocialFeed from './pages/SocialFeed';
 
 // Icons
@@ -189,7 +188,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
     if (!user && isRegistrationPending()) return location.pathname !== '/select-role' ? <Navigate to="/select-role" /> : <>{children}</>;
     
-    const publicPaths = ['/welcome', '/login', '/guide', '/community-license'];
+    const publicPaths = ['/welcome', '/login', '/guide'];
     const isInvitation = location.pathname.startsWith('/invitation/');
     if (!user) return (!publicPaths.includes(location.pathname) && !isInvitation) ? <Navigate to="/welcome" /> : <>{children}</>;
 
@@ -230,7 +229,6 @@ const App = () => {
             <Route path="/select-role" element={<Layout><RoleSelection /></Layout>} />
             <Route path="/invitation/:id" element={<Layout><InvitationCard /></Layout>} />
             <Route path="/guide" element={<Layout><UserGuide /></Layout>} />
-            <Route path="/community-license" element={<Layout><CommunityLicense /></Layout>} />
             <Route path="/" element={<Layout><PrivateRoute><Dashboard /></PrivateRoute></Layout>} />
             <Route path="/community" element={<Layout><PrivateRoute><SocialFeed /></PrivateRoute></Layout>} />
             <Route path="/admin" element={<Layout><PrivateRoute><AdminDashboard /></PrivateRoute></Layout>} />

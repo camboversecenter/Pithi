@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom';
 import { loginUser, loginWithEmailAndPassword, registerWithEmailAndPassword, simulateGoogleLogin } from '../services/authService';
 import { supabase } from '../services/supabaseConfig';
 import { Logo } from '../components/Logo';
-import { 
-  Shield, 
-  BookOpen, 
+import {
+  BookOpen,
   AlertCircle, 
   Info, 
   Send, 
@@ -507,10 +506,6 @@ const Login = () => {
                         <a href="https://t.me/+DBOU-zZhP_lkNTg9" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-1.5">
                             <Send size={12} className="-rotate-12"/> Telegram Support
                         </a>
-                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                        <Link to="/community-license" className="hover:text-rose-600 transition-colors flex items-center gap-1.5">
-                            <Shield size={12}/> អាជ្ញាប័ណ្ណ
-                        </Link>
                     </div>
                     <div className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">
                         Ver 1.02 (Preview Built)

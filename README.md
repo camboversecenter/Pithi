@@ -11,6 +11,16 @@ vendors who service them, in a single Khmer-language marketplace. It works fully
 online against Supabase, and also runs in a self-contained demo mode with no
 backend at all.
 
+## About the project
+
+PITHI is a **community project**. It is **free for everyone to use — we never
+charge users**. Instead, the project sustains itself through voluntary
+**support, donations, and training**, never through user fees. PITHI is planned
+for release as **open source** (see [License](#license)).
+
+PITHI is **incubated by CamboVerse, at the National University of Management
+(NUM)**, Cambodia.
+
 ## Features
 
 - **Role-based portals** — seven roles each get a tailored experience:
@@ -87,5 +97,32 @@ lets the entire app be demoed without any backend configured.
 - `npm run lint` — type-check only (`tsc --noEmit`)
 - `npm run preview` — preview the production build
 - `npm run deploy` — build and deploy to Cloudflare Pages
-</content>
-</invoke>
+
+## License
+
+PITHI is planned for release as **open source**. The intended license is the
+**Apache License 2.0**.
+
+Apache-2.0 fits a free community project that earns from services (support,
+donations, training) rather than license fees: it lets anyone freely use, modify,
+and redistribute the code — maximizing adoption and contributions — while adding
+two things a MIT-style license lacks and that matter for an institution-backed
+project:
+
+- an **explicit patent grant** from contributors, and
+- an explicit statement that it does **not** grant trademark rights — so the
+  **PITHI** and **CamboVerse** names and branding stay protected as trademarks.
+
+> The final license is not yet committed to this repository. Before publishing,
+> please confirm copyright/IP ownership with CamboVerse and NUM (incubated
+> projects often have institutional IP terms), and reconcile this with the app's
+> in-product license page. Documentation and non-code content may additionally be
+> released under **CC BY 4.0**.
+
+## Incubation & acknowledgements
+
+PITHI is incubated by **CamboVerse**, the innovation/startup community at the
+**National University of Management (NUM)**, Cambodia. We thank CamboVerse, NUM,
+and every contributor, supporter, and donor who helps keep PITHI free for the
+community.
+

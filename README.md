@@ -100,24 +100,19 @@ lets the entire app be demoed without any backend configured.
 
 ## License
 
-PITHI is planned for release as **open source**. The intended license is the
-**Apache License 2.0**.
+PITHI is **open source** under the **Apache License 2.0** — see
+[`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Copyright 2026 DEVA.
 
 Apache-2.0 fits a free community project that earns from services (support,
-donations, training) rather than license fees: it lets anyone freely use, modify,
-and redistribute the code — maximizing adoption and contributions — while adding
-two things a MIT-style license lacks and that matter for an institution-backed
-project:
+donations, training) rather than license fees: anyone may freely use, modify, and
+redistribute the code — maximizing adoption and contributions — while contributors
+provide an explicit **patent grant**, and the **PITHI** and **CamboVerse** names
+stay protected as trademarks (the license grants no trademark rights).
 
-- an **explicit patent grant** from contributors, and
-- an explicit statement that it does **not** grant trademark rights — so the
-  **PITHI** and **CamboVerse** names and branding stay protected as trademarks.
-
-> The final license is not yet committed to this repository. Before publishing,
-> please confirm copyright/IP ownership with CamboVerse and NUM (incubated
-> projects often have institutional IP terms), and reconcile this with the app's
-> in-product license page. Documentation and non-code content may additionally be
-> released under **CC BY 4.0**.
+> Please ensure this aligns with any CamboVerse/NUM incubation IP terms, and
+> reconcile it with the app's in-product license page
+> (`pages/CommunityLicense.tsx`). Documentation and other non-code content may
+> additionally be offered under **CC BY 4.0**.
 
 ## Incubation & acknowledgements
 

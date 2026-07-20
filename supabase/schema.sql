@@ -959,3 +959,300 @@ $$;
 create trigger on_auth_user_created
     after insert on auth.users
     for each row execute procedure public.handle_new_user();
+
+
+-- ====================================================================
+-- 8. NOTIFICATIONS (in-app inbox)
+-- ====================================================================
+-- Per-user notification rows created automatically by database triggers:
+--   * new booking                    -> notify the provider
+--   * booking status change         -> notify the other party
+--   * booking comment               -> notify the other party
+--   * guest RSVP (accept/decline)   -> notify ceremony owner + organizer
+--   * new review on a service       -> notify the provider
+--   * guest-reported gift transfer  -> notify ceremony owner + organizer
+-- Clients can only read / mark-as-read / delete their OWN rows; inserts
+-- happen exclusively through the SECURITY DEFINER trigger functions, so a
+-- user can never forge a notification for someone else.
+-- --------------------------------------------------------------------
+create table if not exists public.notifications (
+    id bigint primary key generated always as identity,
+    "userId" uuid references public.users(id) on delete cascade not null,
+    type text not null
+        constraint check_notification_type check (type in (
+            'BOOKING_CREATED', 'BOOKING_STATUS', 'BOOKING_COMMENT',
+            'GUEST_RSVP', 'REVIEW', 'GIFT_REPORTED'
+        )),
+    title text not null,
+    body text,
+    link text,
+    "isRead" boolean not null default false,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
+);
+
+create index if not exists idx_notifications_user_unread
+    on public.notifications ("userId", "isRead")
+    where "deletedAt" is null;
+
+create index if not exists idx_notifications_user_created
+    on public.notifications ("userId", "createdAt" desc);
+
+alter table public.notifications enable row level security;
+
+create policy "Enable select own notifications"
+    on public.notifications for select
+    using (auth.uid() = "userId");
+
+create policy "Enable update own notifications"
+    on public.notifications for update
+    using (auth.uid() = "userId")
+    with check (auth.uid() = "userId");
+
+create policy "Enable delete own notifications"
+    on public.notifications for delete
+    using (auth.uid() = "userId");
+
+-- No INSERT policy on purpose: only the trigger functions below may write.
+
+create or replace function public.push_notification(
+    p_user uuid, p_type text, p_title text, p_body text, p_link text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if p_user is null then
+        return;
+    end if;
+    if auth.uid() is not null and p_user = auth.uid() then
+        return;
+    end if;
+    insert into public.notifications ("userId", type, title, body, link)
+    values (p_user, p_type, p_title, p_body, p_link);
+end;
+$$;
+
+revoke execute on function public.push_notification(uuid, text, text, text, text) from public, anon, authenticated;
+
+create or replace function public.notify_on_booking_created()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_client text;
+begin
+    select name into v_client from public.users where id = new."bookedByUserId";
+    perform public.push_notification(
+        new."providerId",
+        'BOOKING_CREATED',
+        'មានការកក់សេវាកម្មថ្មី',
+        coalesce(v_client, 'អតិថិជន') || ' បានកក់ « ' || new."serviceName"
+            || ' » សម្រាប់ថ្ងៃទី ' || to_char(new.date, 'DD/MM/YYYY') || '។',
+        '/booking/' || new.id
+    );
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_booking_created on public.bookings;
+create trigger trg_notify_on_booking_created
+    after insert on public.bookings
+    for each row execute function public.notify_on_booking_created();
+
+create or replace function public.notify_on_booking_status_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_label text;
+begin
+    if new.status is distinct from old.status then
+        v_label := case new.status
+            when 'CONFIRMED' then 'ត្រូវបានបញ្ជាក់'
+            when 'COMPLETED' then 'ត្រូវបានបញ្ចប់'
+            when 'CANCELLED' then 'ត្រូវបានបោះបង់'
+            else 'ត្រូវបានផ្លាស់ប្តូរស្ថានភាព'
+        end;
+        perform public.push_notification(
+            new."bookedByUserId", 'BOOKING_STATUS',
+            'ស្ថានភាពការកក់បានផ្លាស់ប្តូរ',
+            'ការកក់ « ' || new."serviceName" || ' » ' || v_label || '។',
+            '/booking/' || new.id
+        );
+        perform public.push_notification(
+            new."providerId", 'BOOKING_STATUS',
+            'ស្ថានភាពការកក់បានផ្លាស់ប្តូរ',
+            'ការកក់ « ' || new."serviceName" || ' » ' || v_label || '។',
+            '/booking/' || new.id
+        );
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_booking_status_change on public.bookings;
+create trigger trg_notify_on_booking_status_change
+    after update on public.bookings
+    for each row execute function public.notify_on_booking_status_change();
+
+create or replace function public.notify_on_booking_comment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_booking public.bookings%rowtype;
+    v_recipient uuid;
+begin
+    select * into v_booking from public.bookings where id = new."bookingId";
+    if found then
+        if new."userId" = v_booking."providerId" then
+            v_recipient := v_booking."bookedByUserId";
+        else
+            v_recipient := v_booking."providerId";
+        end if;
+        perform public.push_notification(
+            v_recipient, 'BOOKING_COMMENT',
+            'មតិយោបល់ថ្មីលើការកក់',
+            new."userName" || ' បានបញ្ចេញមតិលើ « ' || v_booking."serviceName" || ' »៖ '
+                || left(new.content, 120),
+            '/booking/' || v_booking.id
+        );
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_booking_comment on public.booking_comments;
+create trigger trg_notify_on_booking_comment
+    after insert on public.booking_comments
+    for each row execute function public.notify_on_booking_comment();
+
+create or replace function public.notify_on_guest_rsvp()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_ceremony public.ceremonies%rowtype;
+    v_label text;
+begin
+    if new.status is distinct from old.status and new.status in ('ACCEPTED', 'DECLINED') then
+        select * into v_ceremony from public.ceremonies where id = new."ceremonyId";
+        if found then
+            if new.status = 'ACCEPTED' then
+                v_label := ' បានទទួលយកការអញ្ជើញចូលរួម « ';
+            else
+                v_label := ' បានបដិសេធការអញ្ជើញចូលរួម « ';
+            end if;
+            perform public.push_notification(
+                v_ceremony."ownerId", 'GUEST_RSVP',
+                'ការឆ្លើយតបនឹងការអញ្ជើញ',
+                new.name || v_label || v_ceremony.title || ' »។',
+                '/owner'
+            );
+            perform public.push_notification(
+                v_ceremony."organizerId", 'GUEST_RSVP',
+                'ការឆ្លើយតបនឹងការអញ្ជើញ',
+                new.name || v_label || v_ceremony.title || ' »។',
+                '/organizer'
+            );
+        end if;
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_guest_rsvp on public.guests;
+create trigger trg_notify_on_guest_rsvp
+    after update on public.guests
+    for each row execute function public.notify_on_guest_rsvp();
+
+create or replace function public.notify_on_review_created()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_provider uuid;
+    v_service text;
+begin
+    select "providerId", name into v_provider, v_service
+    from public.services where id = new."serviceId";
+    perform public.push_notification(
+        v_provider, 'REVIEW',
+        'ការវាយតម្លៃថ្មីលើសេវាកម្មរបស់អ្នក',
+        new."userName" || ' បានវាយតម្លៃ ' || new.rating || ' ផ្កាយ លើ « '
+            || coalesce(v_service, 'សេវាកម្ម') || ' »។',
+        '/vendor'
+    );
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_review_created on public.reviews;
+create trigger trg_notify_on_review_created
+    after insert on public.reviews
+    for each row execute function public.notify_on_review_created();
+
+create or replace function public.notify_on_gift_reported()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_ceremony public.ceremonies%rowtype;
+begin
+    select * into v_ceremony from public.ceremonies where id = new."ceremonyId";
+    if found then
+        perform public.push_notification(
+            v_ceremony."ownerId", 'GIFT_REPORTED',
+            'មានការរាយការណ៍ចំណងដៃថ្មី',
+            new."guestName" || ' បានរាយការណ៍ការផ្ទេរប្រាក់ចំនួន ' || new.amount || ' '
+                || new.currency || ' សម្រាប់ « ' || v_ceremony.title || ' »។',
+            '/owner'
+        );
+        perform public.push_notification(
+            v_ceremony."organizerId", 'GIFT_REPORTED',
+            'មានការរាយការណ៍ចំណងដៃថ្មី',
+            new."guestName" || ' បានរាយការណ៍ការផ្ទេរប្រាក់ចំនួន ' || new.amount || ' '
+                || new.currency || ' សម្រាប់ « ' || v_ceremony.title || ' »។',
+            '/organizer'
+        );
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_gift_reported on public.reported_transactions;
+create trigger trg_notify_on_gift_reported
+    after insert on public.reported_transactions
+    for each row execute function public.notify_on_gift_reported();
+
+-- Realtime: stream new notifications to the signed-in user instantly.
+do $$
+begin
+    if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime'
+          and schemaname = 'public'
+          and tablename = 'notifications'
+    ) then
+        alter publication supabase_realtime add table public.notifications;
+    end if;
+exception when undefined_object then
+    null; -- no supabase_realtime publication on this database; realtime is optional
+end;
+$$;

@@ -207,6 +207,26 @@ export interface BookingLog {
   deletedAt?: string | null;
 }
 
+// --- NOTIFICATIONS ---
+
+export type NotificationType =
+    'BOOKING_CREATED' | 'BOOKING_STATUS' | 'BOOKING_COMMENT' |
+    'GUEST_RSVP' | 'REVIEW' | 'GIFT_REPORTED';
+
+// Named AppNotification to avoid clashing with the DOM Notification API.
+export interface AppNotification {
+    id: string;
+    userId: string;
+    type: NotificationType;
+    title: string;
+    body?: string;
+    link?: string; // In-app route, e.g. '/booking/12'
+    isRead: boolean;
+    createdAt: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
+}
+
 // --- SOCIAL FEATURE TYPES ---
 
 export interface SocialPost {

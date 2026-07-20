@@ -32,6 +32,10 @@ PITHI is **incubated by CamboVerse, at the National University of Management
   a booking detail view backed by a comment thread and an activity/audit log.
 - **Digital invitations & RSVP** — shareable invitation cards and guest RSVP
   tracking.
+- **In-app notifications** — a per-user notification inbox (bell + unread
+  badge) fed by database triggers and delivered live over Supabase Realtime:
+  new bookings, booking status changes, booking comments, guest RSVPs, service
+  reviews, and guest-reported gift transfers all notify the affected users.
 - **Finance tracking** — record income, expenses, and gifts, plus guest-reported
   bank transfers with AI receipt scanning and KHQR payment support.
 - **AI assistant (Google Gemini)** — a Khmer chatbot with function-calling tools

@@ -4,6 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate, useLocation, Link } from
 import { User, UserRole } from './types';
 import { getCurrentUser, logout, subscribe, isRegistrationPending, isSuperAdmin } from './services/authService';
 import { GlobalDialogProvider } from './contexts/GlobalDialogContext';
+import { NotificationProvider, useNotifications } from './contexts/NotificationContext';
 import { Logo } from './components/Logo';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
@@ -24,9 +25,10 @@ import InvitedCeremonies from './pages/InvitedCeremonies';
 import AdminDashboard from './pages/AdminDashboard';
 import UserGuide from './pages/UserGuide';
 import SocialFeed from './pages/SocialFeed';
+import Notifications from './pages/Notifications';
 
 // Icons
-import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send } from 'lucide-react';
+import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send, Bell } from 'lucide-react';
 
 const PrivateRoute = ({ children }: { children?: React.ReactNode }) => {
   const user = getCurrentUser();
@@ -92,16 +94,27 @@ const MobileBottomNav = ({ user, activePath }: { user: User, activePath: string 
     );
 };
 
+const UnreadCountBadge = ({ count, className = '' }: { count: number, className?: string }) => {
+    if (count <= 0) return null;
+    return (
+        <span className={`bg-rose-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center ${className}`}>
+            {count > 99 ? '99+' : count}
+        </span>
+    );
+};
+
 const DesktopSidebar = ({ user, activePath, onLogout }: { user: User, activePath: string, onLogout: () => void }) => {
-    const NavItem = ({ to, icon: Icon, label }: any) => {
+    const { unreadCount } = useNotifications();
+    const NavItem = ({ to, icon: Icon, label, badge = 0 }: any) => {
         const isActive = activePath === to;
         return (
-            <Link 
-                to={to} 
+            <Link
+                to={to}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all mb-1 group ${isActive ? 'bg-rose-50 text-rose-700 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
             >
                 <Icon size={18} className={isActive ? 'text-rose-600' : 'text-slate-400 group-hover:text-slate-600'} />
-                <span className="text-sm tracking-wide">{label}</span>
+                <span className="text-sm tracking-wide flex-1">{label}</span>
+                <UnreadCountBadge count={badge} />
             </Link>
         );
     };
@@ -121,6 +134,7 @@ const DesktopSidebar = ({ user, activePath, onLogout }: { user: User, activePath
                 {user.role === UserRole.GENERAL_USER && <NavItem to="/owner" icon={Wallet} label="កម្មវិធីរបស់ខ្ញុំ" />}
                 
                 <NavItem to="/community" icon={MessageSquare} label="សហគមន៍" />
+                <NavItem to="/notifications" icon={Bell} label="ការជូនដំណឹង" badge={unreadCount} />
 
                 {(!['CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON'].includes(user.role)) && (
                     <NavItem to="/marketplace" icon={Search} label="ទីផ្សារសេវាកម្ម" />
@@ -175,6 +189,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(getCurrentUser());
     const [loading, setLoading] = useState(true);
     const location = useLocation();
+    const { unreadCount } = useNotifications();
 
     useEffect(() => {
         const unsubscribe = subscribe((updatedUser) => {
@@ -213,6 +228,10 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
             <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-md z-40 border-b border-slate-200 flex items-center justify-between px-4">
                 <Logo variant="full" size="sm" />
                 <div className="flex items-center gap-3">
+                    <Link to="/notifications" className="relative">
+                        <Bell size={20} className="text-slate-400" />
+                        <UnreadCountBadge count={unreadCount} className="absolute -top-2 -right-2 border-2 border-white h-auto min-w-[16px] text-[9px]" />
+                    </Link>
                     <Link to="/guide">
                         <BookOpen size={20} className="text-slate-400" />
                     </Link>
@@ -234,6 +253,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 const App = () => {
   return (
     <GlobalDialogProvider>
+        <NotificationProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
             <Route path="/welcome" element={<Layout><Landing /></Layout>} />
@@ -243,6 +263,7 @@ const App = () => {
             <Route path="/guide" element={<Layout><UserGuide /></Layout>} />
             <Route path="/" element={<Layout><PrivateRoute><Dashboard /></PrivateRoute></Layout>} />
             <Route path="/community" element={<Layout><PrivateRoute><SocialFeed /></PrivateRoute></Layout>} />
+            <Route path="/notifications" element={<Layout><PrivateRoute><Notifications /></PrivateRoute></Layout>} />
             <Route path="/admin" element={<Layout><RoleRoute roles={[UserRole.ADMIN]}><AdminDashboard /></RoleRoute></Layout>} />
             <Route path="/organizer" element={<Layout><RoleRoute roles={[UserRole.ORGANIZER]}><OrganizerPortal /></RoleRoute></Layout>} />
             <Route path="/owner" element={<Layout><RoleRoute roles={[UserRole.GENERAL_USER]}><OwnerPortal /></RoleRoute></Layout>} />
@@ -255,6 +276,7 @@ const App = () => {
         </Router>
         <PWAInstallPrompt />
         <PWAUpdateNotification />
+        </NotificationProvider>
     </GlobalDialogProvider>
   );
 };

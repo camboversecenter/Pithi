@@ -1892,38 +1892,41 @@ export const getSocialPosts = async (userId: string, page = 1, limit = 10, searc
         return handleLocalGetSocialPosts(userId, page, limit, search, onlyBookmarked);
     }
 
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const mapRows = (rows: any[]): SocialPost[] => (rows || []).map(p => ({
+        ...p,
+        isBookmarked: p.post_bookmarks?.some((b: any) => b.userId === userId),
+        myReaction: p.post_reactions?.find((r: any) => r.userId === userId)?.reactionType
+    }));
+
     try {
         let query = supabase.from('social_posts').select('*, post_bookmarks(userId), post_reactions(userId, reactionType)', { count: 'exact' });
+
+        if (onlyBookmarked) {
+            // Restrict to the posts this user bookmarked BEFORE paginating, so the
+            // page size and total count are correct (filtering after range() would
+            // drop rows from the page and report the wrong total).
+            const { data: bookmarkRows } = await supabase.from('post_bookmarks').select('postId').eq('userId', userId);
+            const bookmarkedIds = (bookmarkRows || []).map((b: any) => b.postId);
+            if (bookmarkedIds.length === 0) {
+                return { data: [], total: 0, page, limit, totalPages: 0 };
+            }
+            query = query.in('id', bookmarkedIds);
+        }
 
         if (search) {
             query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
         }
 
-        query = query.order('createdAt', { ascending: false });
-
-        const from = (page - 1) * limit;
-        const to = from + limit - 1;
-        query = query.range(from, to);
+        query = query.order('createdAt', { ascending: false }).range(from, to);
 
         const { data, error, count } = await query;
         if (error) throw error;
 
-        let mapped = (data as any[] || []).map(p => {
-            const isBookmarked = p.post_bookmarks?.some((b: any) => b.userId === userId);
-            const myReaction = p.post_reactions?.find((r: any) => r.userId === userId)?.reactionType;
-            return {
-                ...p,
-                isBookmarked,
-                myReaction
-            };
-        });
-
-        if (onlyBookmarked) {
-            mapped = mapped.filter(p => p.isBookmarked);
-        }
-
         return {
-            data: mapped as SocialPost[],
+            data: mapRows(data as any[]),
             total: count || 0,
             page,
             limit,
@@ -2028,18 +2031,26 @@ export const reactToPost = async (postId: string, userId: string, type: PostReac
         return;
     }
 
+    const colFor = (t: string) => t === 'LIKE' ? 'likes' : t === 'USEFUL' ? 'useful' : 'fakes';
+
     try {
-        const { data: existing } = await supabase.from('post_reactions').select('*').eq('postId', postId).eq('userId', userId).eq('reactionType', type).single();
-        
-        if (existing) {
-            await supabase.from('post_reactions').delete().eq('id', existing.id);
-            const col = type === 'LIKE' ? 'likes' : type === 'USEFUL' ? 'useful' : 'fakes';
-            await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: col });
+        // A user has at most one reaction per post. Look up whatever they had.
+        const { data: priorRows } = await supabase.from('post_reactions').select('*').eq('postId', postId).eq('userId', userId).limit(1);
+        const prior = priorRows && priorRows[0];
+
+        if (prior && prior.reactionType === type) {
+            // Same reaction tapped again -> toggle it off.
+            await supabase.from('post_reactions').delete().eq('id', prior.id);
+            await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: colFor(type) });
         } else {
-            await supabase.from('post_reactions').delete().eq('postId', postId).eq('userId', userId);
+            // Switching from a different reaction -> decrement the OLD counter too,
+            // otherwise the previous reaction's count is left inflated.
+            if (prior) {
+                await supabase.from('post_reactions').delete().eq('id', prior.id);
+                await supabase.rpc('decrement_post_stat', { post_id: postId, col_name: colFor(prior.reactionType) });
+            }
             await supabase.from('post_reactions').insert({ postId, userId, reactionType: type });
-            const col = type === 'LIKE' ? 'likes' : type === 'USEFUL' ? 'useful' : 'fakes';
-            await supabase.rpc('increment_post_stat', { post_id: postId, col_name: col });
+            await supabase.rpc('increment_post_stat', { post_id: postId, col_name: colFor(type) });
         }
     } catch (err) {
         console.warn("reactToPost Supabase error, falling back to local storage:", err);

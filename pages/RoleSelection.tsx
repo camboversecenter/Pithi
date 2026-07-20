@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { completeRegistration, getPendingUser, logout } from '../services/authService';
 import { UserRole } from '../types';
-import { ShieldCheck, Heart, ChefHat, Music, Home, Sparkles, AlertTriangle, Check } from 'lucide-react';
+import { ShieldCheck, Heart, ChefHat, Music, Home, Sparkles, AlertTriangle, Check, AlertCircle } from 'lucide-react';
 import { Logo } from '../components/Logo';
 
 const RoleSelection = () => {
@@ -11,6 +11,7 @@ const RoleSelection = () => {
     const pendingUser = getPendingUser();
     const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
         // Security: If no pending user (e.g. page refresh or direct access), kick back to login
@@ -33,11 +34,13 @@ const RoleSelection = () => {
     const handleConfirm = async () => {
         if (!selectedRole) return;
         setIsSubmitting(true);
+        setErrorMsg(null);
         try {
             await completeRegistration(selectedRole);
             navigate('/');
-        } catch (error) {
+        } catch (error: any) {
             console.error("Registration failed", error);
+            setErrorMsg(error?.message || "ការចុះឈ្មោះបរាជ័យ។ សូមព្យាយាមម្តងទៀត។ (Registration failed. Please try again.)");
             setIsSubmitting(false);
         }
     };
@@ -96,7 +99,14 @@ const RoleSelection = () => {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="absolute bottom-0 right-0 left-0 md:left-1/3 bg-white p-6 border-t border-slate-100 flex justify-end items-center gap-4">
+                    <div className="absolute bottom-0 right-0 left-0 md:left-1/3 bg-white p-6 border-t border-slate-100 flex flex-col gap-3">
+                       {errorMsg && (
+                           <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 flex items-start">
+                               <AlertCircle size={15} className="mr-2 flex-shrink-0 mt-0.5"/>
+                               <span className="font-semibold leading-relaxed">{errorMsg}</span>
+                           </div>
+                       )}
+                       <div className="flex justify-end items-center gap-4">
                          <span className="text-xs text-slate-400 hidden sm:block">
                             {selectedRole ? "ចុច 'បញ្ចប់ការចុះឈ្មោះ' ដើម្បីបន្ត" : "សូមជ្រើសរើសមួយ"}
                          </span>
@@ -107,6 +117,7 @@ const RoleSelection = () => {
                          >
                              {isSubmitting ? 'កំពុងដំណើរការ...' : 'បញ្ចប់ការចុះឈ្មោះ'}
                          </button>
+                       </div>
                     </div>
                 </div>
             </div>

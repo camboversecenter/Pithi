@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import { getCurrentUser } from '../services/authService';
 import { getBookings } from '../services/dataService';
-import { Booking } from '../types';
-import { Card, Badge, Pagination } from '../components/UIComponents';
-import { ArrowLeft, Calendar, Clock, Eye, FileText, History, CalendarClock } from 'lucide-react';
+import { Booking, BookingStatus } from '../types';
+import { Card, Badge, Pagination, CalendarView } from '../components/UIComponents';
+import { ArrowLeft, Calendar, Clock, Eye, FileText, History, CalendarClock, CalendarDays } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BookingHistory = () => {
@@ -14,11 +14,21 @@ const BookingHistory = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [activeTab, setActiveTab] = useState<'UPCOMING' | 'PAST'>('UPCOMING');
+  const [activeTab, setActiveTab] = useState<'UPCOMING' | 'PAST' | 'CALENDAR'>('UPCOMING');
   const itemsPerPage = 10;
 
+  // Availability calendar
+  const [calendarBookings, setCalendarBookings] = useState<Booking[]>([]);
+  const [calendarDate, setCalendarDate] = useState(new Date().toISOString().split('T')[0]);
+
   useEffect(() => {
-    if (user) {
+    if (!user) return;
+    if (activeTab === 'CALENDAR') {
+      // The calendar needs the full schedule, not one page of it
+      getBookings(user.id, user.role, 1, 500, 'ALL')
+        .then(res => setCalendarBookings(res.data))
+        .catch(e => console.error("Error loading calendar bookings:", e));
+    } else {
       loadData(currentPage, activeTab);
     }
   }, [user, currentPage, activeTab]);
@@ -41,7 +51,7 @@ const BookingHistory = () => {
       navigate('/');
   };
 
-  const handleTabChange = (tab: 'UPCOMING' | 'PAST') => {
+  const handleTabChange = (tab: 'UPCOMING' | 'PAST' | 'CALENDAR') => {
       setActiveTab(tab);
       setCurrentPage(1); // Reset to first page when switching tabs
   };
@@ -139,16 +149,68 @@ const BookingHistory = () => {
                     <CalendarClock className="w-4 h-4 mr-2" />
                     ការកក់បច្ចុប្បន្ន
                 </button>
-                <button 
+                <button
                     onClick={() => handleTabChange('PAST')}
                     className={`flex items-center px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'PAST' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     <History className="w-4 h-4 mr-2" />
                     ការកក់ចាស់ៗ
                 </button>
+                <button
+                    onClick={() => handleTabChange('CALENDAR')}
+                    className={`flex items-center px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'CALENDAR' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <CalendarDays className="w-4 h-4 mr-2" />
+                    ប្រតិទិន
+                </button>
             </div>
 
-            {loading ? (
+            {activeTab === 'CALENDAR' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <CalendarView
+                        bookings={calendarBookings.filter(b => b.status !== BookingStatus.CANCELLED)}
+                        selectedDate={calendarDate}
+                        onDateSelect={setCalendarDate}
+                    />
+                    <Card title={`ការកក់ថ្ងៃទី ${calendarDate}`}>
+                        {(() => {
+                            const dayBookings = calendarBookings
+                                .filter(b => b.date === calendarDate && b.status !== BookingStatus.CANCELLED)
+                                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                            if (dayBookings.length === 0) {
+                                return (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <Clock size={32} className="mx-auto mb-3 opacity-30" />
+                                        <p className="text-sm font-medium text-emerald-600">ថ្ងៃនេះទំនេរ — មិនមានការកក់ទេ។</p>
+                                    </div>
+                                );
+                            }
+                            return (
+                                <div className="space-y-3">
+                                    {dayBookings.map(b => (
+                                        <button
+                                            key={b.id}
+                                            onClick={() => navigate(`/booking/${b.id}`)}
+                                            className="w-full text-left flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-rose-200 hover:bg-rose-50/40 transition-all group"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="p-2 bg-rose-50 text-rose-600 rounded-lg group-hover:bg-rose-100 transition-colors flex-shrink-0">
+                                                    <Clock size={16} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-slate-800 text-sm truncate">{b.serviceName}</p>
+                                                    <p className="text-xs text-slate-500">{b.startTime} - {b.endTime} • {b.ceremonyTitle || 'Unknown'}</p>
+                                                </div>
+                                            </div>
+                                            <Badge status={b.status} />
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                    </Card>
+                </div>
+            ) : loading ? (
                 <Card className="flex justify-center py-20">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-600"></div>
                 </Card>

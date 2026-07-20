@@ -1,7 +1,7 @@
 
 import { getServices, createBooking, getCeremonies, getReviews, addReview, getBookingsByService, ServiceFilters } from '../services/dataService';
 import { getCurrentUser } from '../services/authService';
-import { Service, UserRole, Ceremony, Review, Booking } from '../types';
+import { Service, UserRole, Ceremony, Review, Booking, BookingStatus } from '../types';
 import { Button, Card, Modal, Input, Pagination, CalendarView, SearchableSelect } from '../components/UIComponents';
 import { Search, MapPin, Star, Calendar, AlertCircle, Clock, Globe, Loader2, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -9,7 +9,7 @@ import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const Marketplace = () => {
   const user = getCurrentUser();
-  const { showAlert } = useGlobalDialog();
+  const { showAlert, showConfirm } = useGlobalDialog();
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [filterRole, setFilterRole] = useState<string>('ALL');
@@ -139,6 +139,29 @@ const Marketplace = () => {
       if (bookingStartTime >= bookingEndTime) {
           await showAlert("ព័ត៌មានមិនត្រឹមត្រូវ", "ម៉ោងបញ្ចប់ត្រូវតែក្រោយម៉ោងចាប់ផ្តើម។", "warning");
           return;
+      }
+
+      // Time-clash checks against the provider's existing bookings that day
+      const overlapping = serviceBookings.filter(b =>
+          b.date === bookingDate && b.startTime < bookingEndTime && b.endTime > bookingStartTime
+      );
+      const confirmedClash = overlapping.find(b => b.status === BookingStatus.CONFIRMED);
+      if (confirmedClash) {
+          await showAlert(
+              "ម៉ោងជាប់រវល់",
+              `ម៉ោងនេះត្រូវបានកក់ និងបញ្ជាក់រួចហើយ (${confirmedClash.startTime} - ${confirmedClash.endTime})។ សូមជ្រើសរើសម៉ោង ឬថ្ងៃផ្សេង។`,
+              "warning"
+          );
+          return;
+      }
+      const pendingClash = overlapping.find(b => b.status === BookingStatus.PENDING);
+      if (pendingClash) {
+          const proceed = await showConfirm(
+              "មានសំណើកក់ជាន់គ្នា",
+              `មានអតិថិជនផ្សេងបានស្នើកក់ម៉ោងនេះរួចហើយ (${pendingClash.startTime} - ${pendingClash.endTime}) ប៉ុន្តែមិនទាន់ត្រូវបានបញ្ជាក់ទេ។ តើអ្នកចង់បន្តស្នើកក់ដែរឬទេ?`,
+              "warning"
+          );
+          if (!proceed) return;
       }
 
       setIsBookingLoading(true);

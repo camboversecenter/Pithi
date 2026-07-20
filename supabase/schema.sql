@@ -1256,3 +1256,47 @@ exception when undefined_object then
     null; -- no supabase_realtime publication on this database; realtime is optional
 end;
 $$;
+
+
+-- ====================================================================
+-- 9. DOUBLE-BOOKING PROTECTION
+-- ====================================================================
+-- Rejects any booking that would become CONFIRMED while another CONFIRMED
+-- booking of the same service overlaps it in time on the same day.
+-- PENDING requests may overlap on purpose: several clients can request the
+-- same slot and the vendor picks which one to confirm.
+-- --------------------------------------------------------------------
+create or replace function public.enforce_booking_no_overlap()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if new.status <> 'CONFIRMED' or new."deletedAt" is not null then
+        return new;
+    end if;
+
+    -- "startTime"/"endTime" are zero-padded HH:MM strings, so plain text
+    -- comparison is chronological.
+    if exists (
+        select 1 from public.bookings b
+        where b."serviceId" = new."serviceId"
+          and b.id <> new.id
+          and b.date = new.date
+          and b.status = 'CONFIRMED'
+          and b."deletedAt" is null
+          and b."startTime" < new."endTime"
+          and b."endTime" > new."startTime"
+    ) then
+        raise exception 'ម៉ោងនេះត្រូវបានកក់រួចហើយ។ សេវាកម្មនេះមានការកក់ដែលបានបញ្ជាក់ក្នុងម៉ោងជាន់គ្នានៅថ្ងៃដដែល។';
+    end if;
+
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_booking_no_overlap on public.bookings;
+create trigger trg_enforce_booking_no_overlap
+    before insert or update on public.bookings
+    for each row execute function public.enforce_booking_no_overlap();

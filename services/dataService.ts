@@ -874,6 +874,25 @@ export const getBookingsByService = async (serviceId: string): Promise<Booking[]
     }
 };
 
+const timesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) =>
+    aStart < bEnd && aEnd > bStart;
+
+// CONFIRMED bookings of the same service that clash with the given slot.
+// Works in local mode too since it builds on getBookingsByService.
+export const getConfirmedBookingConflicts = async (serviceId: string, date: string, startTime: string, endTime: string, excludeBookingId?: string): Promise<Booking[]> => {
+    const all = await getBookingsByService(serviceId);
+    return all.filter(b =>
+        b.date === date &&
+        b.status === BookingStatus.CONFIRMED &&
+        String(b.id) !== String(excludeBookingId ?? '') &&
+        timesOverlap(b.startTime, b.endTime, startTime, endTime)
+    );
+};
+
+// Matches the raise message of the enforce_booking_no_overlap DB trigger.
+const isBookingConflictError = (err: any) =>
+    typeof err?.message === 'string' && err.message.includes('កក់រួចហើយ');
+
 export const getBookingById = async (id: string): Promise<Booking | null> => {
     const fallbackGet = () => {
         const b = getLocalBookings().find(x => x.id === id);
@@ -948,6 +967,17 @@ export const createBooking = async (data: Partial<Booking>): Promise<Booking> =>
 };
 
 export const updateBookingStatus = async (id: string, status: BookingStatus): Promise<void> => {
+    // Confirming must not double-book the service's time slot.
+    if (status === BookingStatus.CONFIRMED) {
+        const booking = await getBookingById(id);
+        if (booking) {
+            const conflicts = await getConfirmedBookingConflicts(booking.serviceId, booking.date, booking.startTime, booking.endTime, id);
+            if (conflicts.length > 0) {
+                throw new Error(`ម៉ោងនេះត្រូវបានកក់រួចហើយ (${conflicts[0].startTime} - ${conflicts[0].endTime})។ សូមកែកាលវិភាគការកក់ណាមួយជាមុនសិន។`);
+            }
+        }
+    }
+
     const fallbackUpdate = () => {
         const local = getLocalBookings();
         const index = local.findIndex(b => b.id === id);
@@ -964,18 +994,30 @@ export const updateBookingStatus = async (id: string, status: BookingStatus): Pr
     }
 
     try {
-        const { error } = await supabase.from('bookings').update({ 
+        const { error } = await supabase.from('bookings').update({
             status,
             updatedAt: new Date().toISOString()
         }).eq('id', id);
         if (error) throw error;
     } catch (err) {
+        // A double-booking rejection from the DB trigger is a real answer,
+        // not an outage — surface it instead of "succeeding" locally.
+        if (isBookingConflictError(err)) throw err;
         console.warn("updateBookingStatus Supabase error, falling back to local storage:", err);
         fallbackUpdate();
     }
 };
 
 export const updateBookingSchedule = async (id: string, date: string, startTime: string, endTime: string, userId: string, userName: string): Promise<Booking> => {
+    // Rescheduling a CONFIRMED booking must not land on an occupied slot.
+    const existing = await getBookingById(id);
+    if (existing && existing.status === BookingStatus.CONFIRMED) {
+        const conflicts = await getConfirmedBookingConflicts(existing.serviceId, date, startTime, endTime, id);
+        if (conflicts.length > 0) {
+            throw new Error(`ម៉ោងនេះត្រូវបានកក់រួចហើយ (${conflicts[0].startTime} - ${conflicts[0].endTime})។ សូមជ្រើសរើសម៉ោងផ្សេង។`);
+        }
+    }
+
     const fallbackUpdate = () => {
         const local = getLocalBookings();
         const index = local.findIndex(b => b.id === id);
@@ -1016,6 +1058,7 @@ export const updateBookingSchedule = async (id: string, date: string, startTime:
             ceremonyTitle: (data as any).ceremonies?.title || 'Unknown Ceremony'
         } as Booking;
     } catch (err) {
+        if (isBookingConflictError(err)) throw err;
         console.warn("updateBookingSchedule Supabase error, falling back to local storage:", err);
         return fallbackUpdate();
     }

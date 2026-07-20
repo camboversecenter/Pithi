@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { getCurrentUser, logout, subscribe, isRegistrationPending, isSuperAdmin } from './services/authService';
@@ -9,23 +9,23 @@ import { Logo } from './components/Logo';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 
-// Pages
-import Landing from './pages/Landing';
-import Login from './pages/Login';
-import RoleSelection from './pages/RoleSelection';
-import Dashboard from './pages/Dashboard';
-import OrganizerPortal from './pages/OrganizerPortal';
-import OwnerPortal from './pages/OwnerPortal';
-import VendorPortal from './pages/VendorPortal';
-import Marketplace from './pages/Marketplace';
-import InvitationCard from './pages/InvitationCard';
-import BookingHistory from './pages/BookingHistory';
-import BookingDetail from './pages/BookingDetail';
-import InvitedCeremonies from './pages/InvitedCeremonies';
-import AdminDashboard from './pages/AdminDashboard';
-import UserGuide from './pages/UserGuide';
-import SocialFeed from './pages/SocialFeed';
-import Notifications from './pages/Notifications';
+// Pages — lazy-loaded so each route ships as its own chunk instead of one bundle
+const Landing = lazy(() => import('./pages/Landing'));
+const Login = lazy(() => import('./pages/Login'));
+const RoleSelection = lazy(() => import('./pages/RoleSelection'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const OrganizerPortal = lazy(() => import('./pages/OrganizerPortal'));
+const OwnerPortal = lazy(() => import('./pages/OwnerPortal'));
+const VendorPortal = lazy(() => import('./pages/VendorPortal'));
+const Marketplace = lazy(() => import('./pages/Marketplace'));
+const InvitationCard = lazy(() => import('./pages/InvitationCard'));
+const BookingHistory = lazy(() => import('./pages/BookingHistory'));
+const BookingDetail = lazy(() => import('./pages/BookingDetail'));
+const InvitedCeremonies = lazy(() => import('./pages/InvitedCeremonies'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const UserGuide = lazy(() => import('./pages/UserGuide'));
+const SocialFeed = lazy(() => import('./pages/SocialFeed'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 
 // Icons
 import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send, Bell } from 'lucide-react';
@@ -255,6 +255,11 @@ const App = () => {
     <GlobalDialogProvider>
         <NotificationProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <Loader2 className="w-8 h-8 animate-spin text-rose-300" />
+            </div>
+        }>
         <Routes>
             <Route path="/welcome" element={<Layout><Landing /></Layout>} />
             <Route path="/login" element={<Layout><Login /></Layout>} />
@@ -273,6 +278,7 @@ const App = () => {
             <Route path="/bookings" element={<Layout><PrivateRoute><BookingHistory /></PrivateRoute></Layout>} />
             <Route path="/booking/:id" element={<Layout><PrivateRoute><BookingDetail /></PrivateRoute></Layout>} />
         </Routes>
+        </Suspense>
         </Router>
         <PWAInstallPrompt />
         <PWAUpdateNotification />

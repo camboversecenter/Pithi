@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import { User, UserRole } from './types';
-import { getCurrentUser, logout, subscribe, isRegistrationPending } from './services/authService';
+import { getCurrentUser, logout, subscribe, isRegistrationPending, isSuperAdmin } from './services/authService';
 import { GlobalDialogProvider } from './contexts/GlobalDialogContext';
 import { Logo } from './components/Logo';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
@@ -32,6 +32,18 @@ const PrivateRoute = ({ children }: { children?: React.ReactNode }) => {
   const user = getCurrentUser();
   return user ? <>{children}</> : <Navigate to="/login" />;
 };
+
+// Restricts a route to specific roles. The super admin can reach any page
+// (needed for the admin "perspective switch" feature); everyone else is sent
+// back to the dashboard if their role isn't allowed.
+const RoleRoute = ({ roles, children }: { roles: UserRole[], children?: React.ReactNode }) => {
+  const user = getCurrentUser();
+  if (!user) return <Navigate to="/login" />;
+  if (isSuperAdmin() || roles.includes(user.role)) return <>{children}</>;
+  return <Navigate to="/" />;
+};
+
+const VENDOR_ROLES = [UserRole.CHEF, UserRole.HALL, UserRole.MUSIC_BAND, UserRole.BEAUTY_SALON];
 
 // --- NAVIGATION COMPONENTS ---
 
@@ -231,11 +243,11 @@ const App = () => {
             <Route path="/guide" element={<Layout><UserGuide /></Layout>} />
             <Route path="/" element={<Layout><PrivateRoute><Dashboard /></PrivateRoute></Layout>} />
             <Route path="/community" element={<Layout><PrivateRoute><SocialFeed /></PrivateRoute></Layout>} />
-            <Route path="/admin" element={<Layout><PrivateRoute><AdminDashboard /></PrivateRoute></Layout>} />
-            <Route path="/organizer" element={<Layout><PrivateRoute><OrganizerPortal /></PrivateRoute></Layout>} />
-            <Route path="/owner" element={<Layout><PrivateRoute><OwnerPortal /></PrivateRoute></Layout>} />
+            <Route path="/admin" element={<Layout><RoleRoute roles={[UserRole.ADMIN]}><AdminDashboard /></RoleRoute></Layout>} />
+            <Route path="/organizer" element={<Layout><RoleRoute roles={[UserRole.ORGANIZER]}><OrganizerPortal /></RoleRoute></Layout>} />
+            <Route path="/owner" element={<Layout><RoleRoute roles={[UserRole.GENERAL_USER]}><OwnerPortal /></RoleRoute></Layout>} />
             <Route path="/invited" element={<Layout><PrivateRoute><InvitedCeremonies /></PrivateRoute></Layout>} />
-            <Route path="/vendor" element={<Layout><PrivateRoute><VendorPortal /></PrivateRoute></Layout>} />
+            <Route path="/vendor" element={<Layout><RoleRoute roles={VENDOR_ROLES}><VendorPortal /></RoleRoute></Layout>} />
             <Route path="/marketplace" element={<Layout><PrivateRoute><Marketplace /></PrivateRoute></Layout>} />
             <Route path="/bookings" element={<Layout><PrivateRoute><BookingHistory /></PrivateRoute></Layout>} />
             <Route path="/booking/:id" element={<Layout><PrivateRoute><BookingDetail /></PrivateRoute></Layout>} />

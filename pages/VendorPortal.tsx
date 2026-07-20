@@ -1,12 +1,12 @@
 
 import { useState, useEffect } from 'react';
 import { getCurrentUser } from '../services/authService';
-import { getMyServices, createService, updateService, deleteService } from '../services/dataService';
+import { getMyServices, createService, updateService, deleteService, getReviews } from '../services/dataService';
 import { generateServiceDescription, generateServicePhoto } from '../services/geminiService';
 import { uploadImage, deleteImage } from '../services/storageService';
-import { Service } from '../types';
+import { Service, Review } from '../types';
 import { Card, Button, Input, Modal, Pagination, Select } from '../components/UIComponents';
-import { Plus, MapPin, Edit2, Trash2, Image as ImageIcon, Globe, Briefcase, Sparkles, Loader2, AlertCircle, Wand2 } from 'lucide-react';
+import { Plus, MapPin, Edit2, Trash2, Image as ImageIcon, Globe, Briefcase, Sparkles, Loader2, AlertCircle, Wand2, Star } from 'lucide-react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const VendorPortal = () => {
@@ -16,6 +16,10 @@ const VendorPortal = () => {
     const [servicePage, setServicePage] = useState(1);
     const [totalServicePages, setTotalServicePages] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Reviews left by clients on this vendor's services
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [reviewsService, setReviewsService] = useState<Service | null>(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,6 +36,20 @@ const VendorPortal = () => {
             refreshServices(servicePage);
         }
     }, [user, servicePage]);
+
+    useEffect(() => {
+        getReviews().then(setReviews).catch(e => console.error("Failed to load reviews", e));
+    }, []);
+
+    const getServiceReviews = (serviceId: string) =>
+        reviews.filter(r => String(r.serviceId) === String(serviceId));
+
+    const getServiceRating = (serviceId: string) => {
+        const serviceReviews = getServiceReviews(serviceId);
+        if (serviceReviews.length === 0) return { average: '0', count: 0 };
+        const sum = serviceReviews.reduce((acc, r) => acc + r.rating, 0);
+        return { average: (sum / serviceReviews.length).toFixed(1), count: serviceReviews.length };
+    };
 
     const refreshServices = async (page: number) => {
         if (!user) return;
@@ -193,6 +211,26 @@ const VendorPortal = () => {
                             </div>
                             <div className="p-6">
                                 <h3 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h3>
+                                {(() => {
+                                    const rating = getServiceRating(service.id);
+                                    return (
+                                        <button
+                                            onClick={() => setReviewsService(service)}
+                                            className="flex items-center gap-1.5 mb-2 text-sm hover:bg-amber-50 rounded-lg px-2 py-1 -ml-2 transition-colors"
+                                            title="មើលការវាយតម្លៃ"
+                                        >
+                                            <Star size={15} className={rating.count > 0 ? "text-amber-400 fill-current" : "text-slate-300"} />
+                                            {rating.count > 0 ? (
+                                                <>
+                                                    <span className="font-bold text-slate-800">{rating.average}</span>
+                                                    <span className="text-slate-400">({rating.count} ការវាយតម្លៃ)</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-400">មិនទាន់មានការវាយតម្លៃ</span>
+                                            )}
+                                        </button>
+                                    );
+                                })()}
                                 <p className="text-sm text-slate-500 mb-4 line-clamp-2">{service.description}</p>
                                 <div className="space-y-2 text-sm text-slate-600 mb-6">
                                     {service.locationType === 'FLEXIBLE' ? (
@@ -339,6 +377,49 @@ const VendorPortal = () => {
                         {isSaving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុកសេវាកម្ម'}
                     </Button>
                 </div>
+            </Modal>
+
+            {/* SERVICE REVIEWS MODAL */}
+            <Modal isOpen={!!reviewsService} onClose={() => setReviewsService(null)} title={`ការវាយតម្លៃ — ${reviewsService?.name || ''}`}>
+                {reviewsService && (() => {
+                    const serviceReviews = getServiceReviews(reviewsService.id);
+                    const rating = getServiceRating(reviewsService.id);
+                    return (
+                        <div className="space-y-5">
+                            <div className="bg-amber-50 rounded-xl p-4 flex items-center justify-center gap-4 border border-amber-100">
+                                <div className="text-4xl font-bold text-slate-800">{rating.average}</div>
+                                <div>
+                                    <div className="flex text-amber-400">
+                                        {[1, 2, 3, 4, 5].map(star => (
+                                            <Star key={star} size={18} className={star <= Math.round(Number(rating.average)) ? "fill-current" : "text-slate-300"} />
+                                        ))}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1 font-bold">{rating.count} ការវាយតម្លៃ</div>
+                                </div>
+                            </div>
+                            <div className="space-y-4 max-h-80 overflow-y-auto">
+                                {serviceReviews.length > 0 ? (
+                                    serviceReviews.map(review => (
+                                        <div key={review.id} className="border-b border-slate-50 pb-4 last:border-0">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="font-bold text-slate-800 text-sm">{review.userName}</span>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase">{review.date}</span>
+                                            </div>
+                                            <div className="flex text-amber-400 mb-2">
+                                                {[1, 2, 3, 4, 5].map(star => (
+                                                    <Star key={star} size={12} className={star <= review.rating ? "fill-current" : "text-slate-200"} />
+                                                ))}
+                                            </div>
+                                            <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100/50">{review.comment}</p>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-center text-slate-400 text-sm py-6">មិនទាន់មានការវាយតម្លៃលើសេវាកម្មនេះទេ។</p>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()}
             </Modal>
         </div>
     );

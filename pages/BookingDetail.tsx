@@ -1,11 +1,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBookingById, getCeremonyById, getServiceById, getBookingComments, getBookingLogs, addBookingComment, updateBookingSchedule, updateBookingStatus, deleteBooking } from '../services/dataService';
+import { getBookingById, getCeremonyById, getServiceById, getBookingComments, getBookingLogs, addBookingComment, updateBookingSchedule, updateBookingStatus, deleteBooking, getReviews, addReview } from '../services/dataService';
 import { getCurrentUser } from '../services/authService';
-import { Booking, Ceremony, Service, BookingComment, BookingLog, UserRole, BookingStatus } from '../types';
+import { Booking, Ceremony, Service, BookingComment, BookingLog, UserRole, BookingStatus, Review } from '../types';
 import { Badge, Card, Button, Input, Modal } from '../components/UIComponents';
-import { ArrowLeft, Calendar, Clock, MapPin, User, DollarSign, FileText, Send, History, Edit2, AlertCircle, Globe, ExternalLink, CheckCircle, XCircle, CheckSquare, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, User, DollarSign, FileText, Send, History, Edit2, AlertCircle, Globe, ExternalLink, CheckCircle, XCircle, CheckSquare, Trash2, Star } from 'lucide-react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const BookingDetail = () => {
@@ -30,6 +30,12 @@ const BookingDetail = () => {
     const [updating, setUpdating] = useState(false);
     const [updateError, setUpdateError] = useState('');
 
+    // Review State
+    const [myReview, setMyReview] = useState<Review | null>(null);
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewComment, setReviewComment] = useState('');
+    const [submittingReview, setSubmittingReview] = useState(false);
+
     useEffect(() => {
         if (id) {
             loadData(id);
@@ -51,7 +57,13 @@ const BookingDetail = () => {
             setService(s);
             setComments(cmts);
             setLogs(lgs);
-            
+
+            // Find the current user's existing review of this service
+            if (currentUser && currentUser.id === b.bookedByUserId) {
+                const reviews = await getReviews();
+                setMyReview(reviews.find(r => String(r.serviceId) === String(b.serviceId) && r.userId === currentUser.id) || null);
+            }
+
             // Init Edit Data
             setEditData({
                 date: b.date,
@@ -155,12 +167,34 @@ const BookingDetail = () => {
         }
     };
 
+    const handleSubmitReview = async () => {
+        if (!currentUser || !booking || !reviewComment.trim()) return;
+        setSubmittingReview(true);
+        try {
+            const newReview = await addReview({
+                serviceId: booking.serviceId,
+                userId: currentUser.id,
+                userName: currentUser.name,
+                rating: reviewRating,
+                comment: reviewComment.trim()
+            });
+            setMyReview(newReview);
+            await showAlert("អរគុណ!", "ការវាយតម្លៃរបស់អ្នកត្រូវបានរក្សាទុក។", "success");
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចរក្សាទុកការវាយតម្លៃបានទេ។", "danger");
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center text-slate-500">កំពុងផ្ទុក...</div>;
     if (!booking) return <div className="p-8 text-center text-slate-500">រកមិនឃើញការកក់នេះទេ។</div>;
 
     // Permissions & Rules
     const isProvider = currentUser?.id === booking.providerId;
     const isPastBooking = booking.date < new Date().toISOString().split('T')[0];
+    // The client may rate the service once the vendor marked the booking completed
+    const canReview = currentUser?.id === booking.bookedByUserId && booking.status === BookingStatus.COMPLETED;
     
     // Merge Comments and Logs for Activity Feed
     const activityFeed = [
@@ -409,6 +443,52 @@ const BookingDetail = () => {
                             <div className="text-slate-500 text-sm italic">មិនមានព័ត៌មានកម្មវិធី</div>
                         )}
                     </Card>
+
+                    {/* Review prompt for completed bookings */}
+                    {canReview && (
+                        <Card title="វាយតម្លៃសេវាកម្មនេះ">
+                            {myReview ? (
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-1 text-amber-400">
+                                        {[1, 2, 3, 4, 5].map(star => (
+                                            <Star key={star} size={20} className={star <= myReview.rating ? "fill-current" : "text-slate-200"} />
+                                        ))}
+                                    </div>
+                                    <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100/50">{myReview.comment}</p>
+                                    <p className="text-xs text-slate-400 font-bold flex items-center gap-1.5">
+                                        <CheckCircle size={12} className="text-emerald-500" />
+                                        អ្នកបានវាយតម្លៃរួចរាល់ ({myReview.date})
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <p className="text-sm text-slate-500">សេវាកម្មនេះបានបញ្ចប់ហើយ។ ចែករំលែកបទពិសោធន៍របស់អ្នក ដើម្បីជួយអ្នកប្រើប្រាស់ផ្សេងទៀត។</p>
+                                    <div className="flex justify-center gap-1">
+                                        {[1, 2, 3, 4, 5].map(star => (
+                                            <button key={star} onClick={() => setReviewRating(star)} className="transition-all hover:scale-125 transform">
+                                                <Star size={30} className={star <= reviewRating ? "text-amber-400 fill-current" : "text-slate-200"} />
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <textarea
+                                        className="w-full px-4 py-3 bg-slate-100 border border-transparent rounded-lg focus:bg-white focus:border-rose-300 focus:ring-4 focus:ring-rose-50 outline-none transition-all placeholder:text-slate-400 text-slate-900 text-sm font-medium resize-none"
+                                        rows={3}
+                                        placeholder="សរសេរមតិយោបល់របស់អ្នក..."
+                                        value={reviewComment}
+                                        onChange={e => setReviewComment(e.target.value)}
+                                    />
+                                    <Button
+                                        onClick={handleSubmitReview}
+                                        isLoading={submittingReview}
+                                        disabled={!reviewComment.trim() || submittingReview}
+                                        className="w-full"
+                                    >
+                                        បញ្ជូនការវាយតម្លៃ
+                                    </Button>
+                                </div>
+                            )}
+                        </Card>
+                    )}
                 </div>
             </div>
 

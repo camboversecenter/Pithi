@@ -79,7 +79,68 @@ begin
 end;
 $$;
 
--- 3. One-time cleanup: demote any non-super-admin who already escalated
+-- 3. Reliable profile registration -----------------------------------
+-- Fixes: "new row violates row-level security policy for table users" when a
+-- new Google user finishes Role Selection. This SECURITY DEFINER function
+-- creates the caller's own profile server-side, so it works even if the
+-- granular INSERT policy on public.users is missing or misconfigured. It is
+-- still safe: it only ever inserts a row for auth.uid() (the verified caller)
+-- and refuses to self-assign ADMIN unless the caller is the super admin.
+create or replace function public.register_profile(p_role text)
+returns public.users
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_id uuid := auth.uid();
+    v_email text := auth.jwt() ->> 'email';
+    v_name text := coalesce(
+        auth.jwt() -> 'user_metadata' ->> 'full_name',
+        nullif(split_part(coalesce(auth.jwt() ->> 'email', ''), '@', 1), ''),
+        'User'
+    );
+    v_avatar text := auth.jwt() -> 'user_metadata' ->> 'avatar_url';
+    v_role text := p_role;
+    v_result public.users;
+begin
+    if v_id is null then
+        raise exception 'Not authenticated';
+    end if;
+
+    -- The super admin is always ADMIN; nobody else may self-assign ADMIN.
+    if v_email = 'pithi.deva@gmail.com' then
+        v_role := 'ADMIN';
+    elsif v_role not in ('GENERAL_USER','ORGANIZER','CHEF','HALL','MUSIC_BAND','BEAUTY_SALON') then
+        raise exception 'Invalid role %', p_role;
+    end if;
+
+    insert into public.users (id, name, email, role, "avatarUrl")
+    values (v_id, v_name, v_email, v_role, v_avatar)
+    on conflict (id) do update set
+        name = excluded.name,
+        "avatarUrl" = excluded."avatarUrl"
+    returning * into v_result;
+
+    return v_result;
+end;
+$$;
+
+grant execute on function public.register_profile(text) to authenticated;
+
+-- Defensive: make sure the basic self-insert / read policies exist too, in case
+-- an earlier partial schema apply left them out.
+drop policy if exists "Allow user insert own profile" on public.users;
+create policy "Allow user insert own profile"
+    on public.users for insert
+    with check (auth.uid() = id);
+
+drop policy if exists "Enable select for everyone" on public.users;
+create policy "Enable select for everyone"
+    on public.users for select
+    using (true);
+
+-- 4. One-time cleanup: demote any non-super-admin who already escalated
 --    themselves to ADMIN through the old hole. Comment out if not desired.
 update public.users
     set role = 'GENERAL_USER'

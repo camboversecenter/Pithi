@@ -439,6 +439,55 @@ create trigger trg_enforce_user_role_integrity
     before insert or update on public.users
     for each row execute function public.enforce_user_role_integrity();
 
+-- --------------------------------------------------------------------
+-- PROFILE REGISTRATION RPC
+-- --------------------------------------------------------------------
+-- Creates the caller's own profile server-side (SECURITY DEFINER) so new-user
+-- registration succeeds regardless of granular INSERT policy state. Safe: only
+-- inserts a row for auth.uid(), and refuses self-assigned ADMIN unless the
+-- caller is the super admin.
+-- --------------------------------------------------------------------
+create or replace function public.register_profile(p_role text)
+returns public.users
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_id uuid := auth.uid();
+    v_email text := auth.jwt() ->> 'email';
+    v_name text := coalesce(
+        auth.jwt() -> 'user_metadata' ->> 'full_name',
+        nullif(split_part(coalesce(auth.jwt() ->> 'email', ''), '@', 1), ''),
+        'User'
+    );
+    v_avatar text := auth.jwt() -> 'user_metadata' ->> 'avatar_url';
+    v_role text := p_role;
+    v_result public.users;
+begin
+    if v_id is null then
+        raise exception 'Not authenticated';
+    end if;
+
+    if v_email = 'pithi.deva@gmail.com' then
+        v_role := 'ADMIN';
+    elsif v_role not in ('GENERAL_USER','ORGANIZER','CHEF','HALL','MUSIC_BAND','BEAUTY_SALON') then
+        raise exception 'Invalid role %', p_role;
+    end if;
+
+    insert into public.users (id, name, email, role, "avatarUrl")
+    values (v_id, v_name, v_email, v_role, v_avatar)
+    on conflict (id) do update set
+        name = excluded.name,
+        "avatarUrl" = excluded."avatarUrl"
+    returning * into v_result;
+
+    return v_result;
+end;
+$$;
+
+grant execute on function public.register_profile(text) to authenticated;
+
 
 -- --------------------------------------------------------------------
 -- ceremonies TABLE POLICIES

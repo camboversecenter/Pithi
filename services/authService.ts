@@ -209,6 +209,26 @@ export const completeRegistration = async (role: UserRole): Promise<User> => {
         throw new Error("សម័យ​ចូល​គណនី​បាន​ផុត​កំណត់។ សូម​ចូល​គណនី​ជាមួយ Google ម្តង​ទៀត។ (Your session expired. Please sign in with Google again.)");
     }
 
+    // Preferred path: a SECURITY DEFINER RPC that creates the profile server-side.
+    // This is robust even if the granular INSERT row-level-security policy on the
+    // users table is missing or misconfigured (the common cause of
+    // "new row violates row-level security policy for table users").
+    try {
+        const { data, error } = await supabase.rpc('register_profile', { p_role: role });
+        if (!error && data) {
+            const profile = (Array.isArray(data) ? data[0] : data) as User;
+            pendingRegistrationUser = null;
+            setCurrentUser(profile);
+            return profile;
+        }
+        if (error) {
+            console.warn("register_profile RPC unavailable, trying direct insert:", error.message);
+        }
+    } catch (rpcErr) {
+        console.warn("register_profile RPC threw, trying direct insert:", rpcErr);
+    }
+
+    // Fallback: direct insert (works when the users INSERT policy is present).
     const newUser: User = {
         id: sessionUser.id,
         name: sessionUser.user_metadata?.full_name || pendingRegistrationUser?.name || sessionUser.email?.split('@')[0] || 'User',
@@ -225,7 +245,7 @@ export const completeRegistration = async (role: UserRole): Promise<User> => {
 
     if (error || !inserted) {
         console.error("completeRegistration insert failed:", error);
-        throw new Error("មិន​អាច​បង្កើត​ប្រវត្តិរូប​បាន​ទេ។ (Could not create your profile: " + (error?.message || "Unknown error") + ")");
+        throw new Error("មិន​អាច​បង្កើត​ប្រវត្តិរូប​បាន​ទេ។ សូម​ដំណើរការ​ឯកសារ migration ក្នុង Supabase។ (Could not create your profile: " + (error?.message || "Unknown error") + ")");
     }
 
     pendingRegistrationUser = null;

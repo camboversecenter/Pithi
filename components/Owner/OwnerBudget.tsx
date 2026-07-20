@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Ceremony, Transaction, ReportedTransaction } from '../../types';
 import { addTransaction, deleteTransaction, confirmReportedTransaction, rejectReportedTransaction } from '../../services/dataService';
 import { Card, Button, Modal, Input, Select } from '../UIComponents';
-import { Plus, AlertCircle, Eye, Check, X, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
+import { Plus, AlertCircle, Eye, Check, X, TrendingUp, TrendingDown, Trash2, Wallet, AlertTriangle } from 'lucide-react';
 import { useGlobalDialog } from '../../contexts/GlobalDialogContext';
 
 interface OwnerBudgetProps {
@@ -23,6 +23,29 @@ const OwnerBudget: React.FC<OwnerBudgetProps> = ({ ceremony, transactions, pendi
     const income = transactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
     const expense = transactions.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount, 0);
     const balance = income - expense;
+
+    // Budget vs actual
+    const plannedBudget = ceremony.budget || 0;
+    const budgetUsedPercent = plannedBudget > 0 ? Math.round((expense / plannedBudget) * 100) : 0;
+    const remainingBudget = plannedBudget - expense;
+    const isOverBudget = plannedBudget > 0 && expense > plannedBudget;
+    const isNearBudget = plannedBudget > 0 && !isOverBudget && budgetUsedPercent >= 80;
+
+    const categoryLabels: { [key: string]: string } = {
+        'Gift': 'ចំណងដៃ',
+        'General': 'ទូទៅ',
+        'Food': 'អាហារ',
+        'Decoration': 'ការតុបតែង'
+    };
+
+    const expenseByCategory = transactions
+        .filter(t => t.type === 'EXPENSE')
+        .reduce((acc, t) => {
+            const cat = t.category || 'General';
+            acc[cat] = (acc[cat] || 0) + t.amount;
+            return acc;
+        }, {} as { [key: string]: number });
+    const categoryEntries = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1]);
 
     const handleConfirmReport = async (report: ReportedTransaction) => {
         try {
@@ -98,6 +121,68 @@ const OwnerBudget: React.FC<OwnerBudgetProps> = ({ ceremony, transactions, pendi
                     <p className="text-lg md:text-2xl font-bold font-serif">${balance}</p>
                 </div>
             </div>
+
+            {/* Budget vs Actual */}
+            {plannedBudget > 0 && (
+                <Card title="ថវិកាគ្រោង vs ចំណាយជាក់ស្តែង">
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2 text-slate-600 font-medium">
+                                <Wallet size={16} className="text-rose-500" />
+                                ថវិកាគ្រោង៖ <span className="font-bold text-slate-900">${plannedBudget}</span>
+                            </div>
+                            <span className={`font-bold ${isOverBudget ? 'text-red-600' : isNearBudget ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {budgetUsedPercent}%
+                            </span>
+                        </div>
+
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all duration-500 ${isOverBudget ? 'bg-red-500' : isNearBudget ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                                style={{ width: `${Math.min(100, budgetUsedPercent)}%` }}
+                            ></div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-slate-500">បានចំណាយ៖ <span className="font-bold text-slate-800">${expense}</span></span>
+                            <span className={remainingBudget >= 0 ? 'text-slate-500' : 'text-red-600 font-bold'}>
+                                {remainingBudget >= 0 ? <>នៅសល់៖ <span className="font-bold text-slate-800">${remainingBudget}</span></> : <>លើសថវិកា៖ ${Math.abs(remainingBudget)}</>}
+                            </span>
+                        </div>
+
+                        {isOverBudget && (
+                            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl text-red-700 text-sm">
+                                <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                                ការចំណាយបានលើសថវិកាដែលបានគ្រោងទុក។ សូមពិនិត្យមើលការចំណាយឡើងវិញ ឬកែតម្រូវថវិកាកម្មវិធី។
+                            </div>
+                        )}
+                        {isNearBudget && (
+                            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-amber-700 text-sm">
+                                <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                                ការចំណាយជិតដល់កម្រិតថវិកាដែលបានគ្រោងទុកហើយ។
+                            </div>
+                        )}
+
+                        {categoryEntries.length > 0 && (
+                            <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">ចំណាយតាមប្រភេទ</p>
+                                {categoryEntries.map(([category, amount]) => (
+                                    <div key={category} className="flex items-center gap-3">
+                                        <span className="text-sm text-slate-600 font-medium w-24 flex-shrink-0 truncate">{categoryLabels[category] || category}</span>
+                                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-rose-400 rounded-full"
+                                                style={{ width: `${expense > 0 ? Math.round((amount / expense) * 100) : 0}%` }}
+                                            ></div>
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-800 w-16 text-right flex-shrink-0">${amount}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
 
             {/* Pending Transfers Section */}
             {pendingReports.length > 0 && (

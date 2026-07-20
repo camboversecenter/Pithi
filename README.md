@@ -28,8 +28,13 @@ PITHI is **incubated by CamboVerse, at the National University of Management
   `HALL`, `MUSIC_BAND`, `BEAUTY_SALON`, and `ADMIN`.
 - **Ceremony management** — create and manage events, budgets, guest lists, and
   step-by-step plans from the Organizer and Owner portals.
-- **Marketplace & bookings** — vendors publish services; clients book them, with
-  a booking detail view backed by a comment thread and an activity/audit log.
+- **Marketplace & bookings** — vendors publish services; clients search,
+  filter (price, location type), and book them, with a booking detail view
+  backed by a comment thread and an activity/audit log. Completed bookings
+  prompt the client for a star rating + review, and vendors see their ratings.
+- **Availability & double-booking protection** — a calendar view of each
+  vendor's schedule, busy-time warnings while booking, and a database trigger
+  that rejects confirming two overlapping bookings of the same service.
 - **Digital invitations & RSVP** — shareable invitation cards and guest RSVP
   tracking.
 - **In-app notifications** — a per-user notification inbox (bell + unread
@@ -37,7 +42,9 @@ PITHI is **incubated by CamboVerse, at the National University of Management
   new bookings, booking status changes, booking comments, guest RSVPs, service
   reviews, and guest-reported gift transfers all notify the affected users.
 - **Finance tracking** — record income, expenses, and gifts, plus guest-reported
-  bank transfers with AI receipt scanning and KHQR payment support.
+  bank transfers with AI receipt scanning and KHQR payment support. Includes
+  budget-vs-actual tracking with over-budget warnings, CSV export, and a
+  print-ready traditional gift ledger (កំណត់ចំណងដៃ).
 - **AI assistant (Google Gemini)** — a Khmer chatbot with function-calling tools
   to create ceremonies and book services conversationally; generation of ceremony
   plans, invitation messages, and marketing copy (tone-aware: celebratory for

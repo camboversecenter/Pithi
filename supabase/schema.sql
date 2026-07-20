@@ -148,10 +148,14 @@ create table if not exists public.guests (
     status text not null default 'PENDING'
         constraint check_guest_status check (status in ('PENDING', 'ACCEPTED', 'DECLINED')),
     "guestType" text,
+    "checkedInAt" timestamptz, -- set when the host scans/marks the guest at the entrance
     "createdAt" timestamptz default now(),
     "updatedAt" timestamptz default now(),
     "deletedAt" timestamptz
 );
+
+-- Keeps re-runs of this schema working on databases created before check-in.
+alter table public.guests add column if not exists "checkedInAt" timestamptz;
 
 -- --------------------------------------------------------------------
 -- invitation_templates (Custom descriptions & banner layouts of RSVP invitations)

@@ -151,11 +151,12 @@ export interface ReportedTransaction {
 export interface Guest {
   id: string;
   ceremonyId: string;
-  userId?: string; 
+  userId?: string;
   name: string;
   phoneNumber?: string;
   status: GuestStatus;
-  guestType?: string; 
+  guestType?: string;
+  checkedInAt?: string | null; // Set when the host checks the guest in at the entrance
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;

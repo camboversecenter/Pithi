@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getCurrentUser, getUserById } from '../services/authService';
 import { getMyInvitations, getCeremonyById, respondToInvitation, reportTransaction, getMyReportedTransactions } from '../services/dataService';
+import { generateGuestQr } from '../services/checkinService';
 import { scanBankReceipt } from '../services/geminiService';
 import { uploadImage } from '../services/storageService';
 import { Invitation, Ceremony, GuestStatus, User, ReportedTransaction } from '../types';
@@ -26,6 +27,18 @@ const InvitedCeremonies = () => {
     const [selectedCeremony, setSelectedCeremony] = useState<Ceremony | null>(null);
     const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
     const [owner, setOwner] = useState<User | null>(null);
+    const [entryQr, setEntryQr] = useState<string | null>(null);
+
+    // Entry pass QR, shown once the guest accepted the invitation
+    useEffect(() => {
+        if (selectedInvitation && selectedInvitation.status === GuestStatus.ACCEPTED) {
+            generateGuestQr(String(selectedInvitation.id), selectedInvitation.ceremonyId)
+                .then(setEntryQr)
+                .catch(() => setEntryQr(null));
+        } else {
+            setEntryQr(null);
+        }
+    }, [selectedInvitation?.id, selectedInvitation?.status]);
 
     // Bank Reporting State
     const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
@@ -389,6 +402,22 @@ const InvitedCeremonies = () => {
                                                  <RotateCcw size={12} className="mr-1"/> ផ្លាស់ប្តូរ
                                              </button>
                                          </div>
+                                     )}
+                                 </div>
+                             )}
+
+                             {/* Entry Pass QR */}
+                             {!isPast && selectedInvitation?.status === GuestStatus.ACCEPTED && entryQr && (
+                                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                     <p className="font-bold text-slate-800 mb-1 flex items-center justify-center gap-2">
+                                         <QrCode size={18} className="text-rose-500" /> សំបុត្រចូល
+                                     </p>
+                                     <p className="text-xs text-slate-500 mb-4">បង្ហាញ QR នេះនៅច្រកចូលកម្មវិធី</p>
+                                     <img src={entryQr} alt="Entry QR" className="w-44 h-44 mx-auto bg-white p-2 rounded-xl border border-slate-200" />
+                                     {selectedInvitation.checkedInAt && (
+                                         <p className="text-xs text-emerald-600 font-bold mt-3 flex items-center justify-center gap-1">
+                                             <CheckCircle size={12} /> បានចូលរួមនៅ {new Date(selectedInvitation.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                         </p>
                                      )}
                                  </div>
                              )}

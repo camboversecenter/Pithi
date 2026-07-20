@@ -36,7 +36,9 @@ PITHI is **incubated by CamboVerse, at the National University of Management
   vendor's schedule, busy-time warnings while booking, and a database trigger
   that rejects confirming two overlapping bookings of the same service.
 - **Digital invitations & RSVP** — shareable invitation cards and guest RSVP
-  tracking.
+  tracking, plus QR guest check-in: every accepted guest gets an entry-pass QR
+  on their invitation, and hosts scan it at the door (camera scanner with a
+  manual fallback) with a live checked-in count.
 - **In-app notifications** — a per-user notification inbox (bell + unread
   badge) fed by database triggers and delivered live over Supabase Realtime:
   new bookings, booking status changes, booking comments, guest RSVPs, service

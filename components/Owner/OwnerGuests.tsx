@@ -1,10 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Ceremony, Guest, User, GuestStatus, UserRole } from '../../types';
-import { addGuest, deleteGuest, getGuests, getCeremonies } from '../../services/dataService';
+import { addGuest, deleteGuest, getGuests, getCeremonies, setGuestCheckIn } from '../../services/dataService';
 import { getUsers } from '../../services/authService';
 import { Button, Modal, Input, Select, Pagination } from '../UIComponents';
-import { Plus, Search, Filter, UserPlus, Copy, Upload, Download, Trash2, FileSpreadsheet } from 'lucide-react';
+import CheckInScanner from '../CheckInScanner';
+import { Plus, Search, Filter, UserPlus, Copy, Upload, Download, Trash2, FileSpreadsheet, ScanLine, UserCheck } from 'lucide-react';
 import { useGlobalDialog } from '../../contexts/GlobalDialogContext';
 
 interface OwnerGuestsProps {
@@ -41,6 +42,10 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
     const [searchableUsers, setSearchableUsers] = useState<User[]>([]);
     const [isInviting, setIsInviting] = useState(false);
 
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const checkedInCount = guests.filter(g => g.checkedInAt).length;
+    const acceptedCount = guests.filter(g => g.status === GuestStatus.ACCEPTED).length;
+
     // --- Filter Logic ---
     const filteredGuests = useMemo(() => {
         return guests.filter(g => {
@@ -74,6 +79,15 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
             await showAlert("ជោគជ័យ", "ភ្ញៀវត្រូវបានបន្ថែមដោយជោគជ័យ។", "success");
         } catch (error: any) {
             await showAlert("បរាជ័យ", error.message || "មិនអាចបន្ថែមភ្ញៀវបានឡើយ។", "danger");
+        }
+    };
+
+    const handleToggleCheckIn = async (guest: Guest) => {
+        try {
+            await setGuestCheckIn(String(guest.id), !guest.checkedInAt);
+            onRefresh();
+        } catch (error: any) {
+            await showAlert("បរាជ័យ", error.message || "មិនអាចកត់ត្រាការចូលរួមបានទេ។", "danger");
         }
     };
 
@@ -239,6 +253,9 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
         <div className="space-y-6 animate-fade-in-up">
             {/* Actions */}
             <div className="flex flex-wrap justify-end gap-2 mb-4">
+                <Button variant="secondary" onClick={() => setIsScannerOpen(true)} className="h-8 px-3 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50">
+                    <ScanLine size={14} className="mr-2"/> ស្កេនចូល
+                </Button>
                 <Button variant="secondary" onClick={handleOpenInviteModal} className="h-8 px-3 text-xs">
                     <UserPlus size={14} className="mr-2"/> អញ្ជើញ
                 </Button>
@@ -269,7 +286,7 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
                 </div>
                 <div className="relative md:w-64">
                     <Filter className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-                    <select 
+                    <select
                         className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-100 focus:border-rose-400 outline-none transition-all text-sm appearance-none cursor-pointer"
                         value={guestFilter}
                         onChange={e => setGuestFilter(e.target.value)}
@@ -280,6 +297,9 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
                         <option value="DECLINED">បដិសេធ (Declined)</option>
                     </select>
                 </div>
+                <div className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-sm font-bold whitespace-nowrap" title="ភ្ញៀវបានចូលរួម / បានយល់ព្រម">
+                    <UserCheck size={16}/> {checkedInCount}/{acceptedCount} បានចូលរួម
+                </div>
             </div>
 
             {/* List */}
@@ -287,18 +307,30 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
                 {paginatedGuests.map(g => (
                     <div key={g.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center group hover:shadow-md transition-all">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center font-bold text-lg">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${g.checkedInAt ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                 {g.name.charAt(0)}
                             </div>
                             <div>
                                 <p className="font-bold text-slate-900 line-clamp-1">{g.name}</p>
                                 <p className="text-xs text-slate-500">{g.guestType}</p>
+                                {g.checkedInAt && (
+                                    <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5">
+                                        <UserCheck size={10}/> ចូលរួម {new Date(g.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${g.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' : g.status === 'DECLINED' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'}`}>
                                 {g.status}
                             </span>
+                            <button
+                                onClick={() => handleToggleCheckIn(g)}
+                                className={`p-2 rounded-lg transition-all ${g.checkedInAt ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                title={g.checkedInAt ? 'លុបការចូលរួម' : 'កត់ត្រាការចូលរួម'}
+                            >
+                                <UserCheck size={18}/>
+                            </button>
                             <button onClick={() => handleDeleteGuest(g.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-all"><Trash2 size={18}/></button>
                         </div>
                     </div>
@@ -312,6 +344,15 @@ const OwnerGuests: React.FC<OwnerGuestsProps> = ({ ceremony, guests, onRefresh, 
             </div>
 
             <Pagination currentPage={guestPage} totalPages={totalGuestPages} onPageChange={setGuestPage} />
+
+            {/* --- Check-in Scanner --- */}
+            <CheckInScanner
+                isOpen={isScannerOpen}
+                onClose={() => setIsScannerOpen(false)}
+                ceremonyId={ceremony.id}
+                guests={guests}
+                onCheckedIn={onRefresh}
+            />
 
             {/* --- Modals --- */}
             <Modal isOpen={isGuestModalOpen} onClose={() => setIsGuestModalOpen(false)} title="បន្ថែមភ្ញៀវ">

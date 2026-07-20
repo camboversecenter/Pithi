@@ -1270,6 +1270,33 @@ export const addGuest = async (data: Partial<Guest>): Promise<Guest> => {
     }
 };
 
+export const setGuestCheckIn = async (guestId: string, checkedIn: boolean): Promise<Guest | null> => {
+    const checkedInAt = checkedIn ? new Date().toISOString() : null;
+
+    const fallbackUpdate = (): Guest | null => {
+        const local = getLocalGuests();
+        const index = local.findIndex(g => g.id === guestId);
+        if (index === -1) return null;
+        local[index] = { ...local[index], checkedInAt, updatedAt: new Date().toISOString() };
+        saveLocalGuests(local);
+        return local[index];
+    };
+
+    if (isLocalMode()) return fallbackUpdate();
+
+    try {
+        const { data, error } = await supabase.from('guests').update({
+            checkedInAt,
+            updatedAt: new Date().toISOString()
+        }).eq('id', guestId).select().single();
+        if (error) throw error;
+        return data as Guest;
+    } catch (err) {
+        console.warn("setGuestCheckIn Supabase error, falling back to local storage:", err);
+        return fallbackUpdate();
+    }
+};
+
 export const deleteGuest = async (id: string): Promise<void> => {
     const fallbackDelete = () => {
         const local = getLocalGuests();

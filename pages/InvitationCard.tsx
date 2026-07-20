@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { getCeremonyById, addGuest, getInvitationTemplates } from '../services/dataService';
 import { getCurrentUser } from '../services/authService';
+import { generateGuestQr } from '../services/checkinService';
 import { scanBusinessCard } from '../services/geminiService';
 import { Ceremony, InvitationTemplate } from '../types';
 import { Input, MarkdownRenderer } from '../components/UIComponents';
@@ -27,6 +28,7 @@ const InvitationCard = () => {
   const [submitted, setSubmitted] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [entryQr, setEntryQr] = useState<string | null>(null);
   
   // Scanner State
   const [isScanning, setIsScanning] = useState(false);
@@ -112,16 +114,19 @@ const InvitationCard = () => {
 
     try {
         // Add Guest (Data Service handles Duplicate Checks now)
-        await addGuest({
+        const newGuest = await addGuest({
             ceremonyId: ceremony.id,
             name: name,
             phoneNumber: guestPhone,
             userId: user ? user.id : undefined,
             guestType: guestTypeParam || 'General'
         });
-        
+
         setSubmitted(true);
         localStorage.setItem('last_rsvp_time', Date.now().toString());
+
+        // Entry pass QR for ceremony-day check-in (best effort)
+        generateGuestQr(String(newGuest.id), ceremony.id).then(setEntryQr).catch(() => {});
 
     } catch (error: any) {
         console.error("RSVP Error:", error);
@@ -356,6 +361,16 @@ const InvitationCard = () => {
                                     <CheckCircle className="w-6 h-6 text-emerald-600" />
                                 </div>
                                 <p className="font-bold text-lg font-serif">អរគុណ! ការចូលរួមត្រូវបានកត់ត្រា។</p>
+
+                                {entryQr && (
+                                    <div className="mt-5 pt-5 border-t border-emerald-100 w-full flex flex-col items-center">
+                                        <p className="text-sm font-bold text-slate-700 mb-3">សំបុត្រចូលរបស់អ្នក</p>
+                                        <img src={entryQr} alt="Entry QR" className="w-44 h-44 bg-white p-2 rounded-xl border border-slate-200 shadow-sm" />
+                                        <p className="text-xs text-slate-500 mt-3 leading-relaxed">
+                                            សូមថតរូបអេក្រង់ (screenshot) ទុក ហើយបង្ហាញ QR នេះនៅច្រកចូលកម្មវិធី។
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )
                     )}

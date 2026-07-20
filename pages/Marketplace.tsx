@@ -1,9 +1,9 @@
 
-import { getServices, createBooking, getCeremonies, getReviews, addReview, getBookingsByService } from '../services/dataService';
+import { getServices, createBooking, getCeremonies, getReviews, addReview, getBookingsByService, ServiceFilters } from '../services/dataService';
 import { getCurrentUser } from '../services/authService';
 import { Service, UserRole, Ceremony, Review, Booking } from '../types';
 import { Button, Card, Modal, Input, Pagination, CalendarView, SearchableSelect } from '../components/UIComponents';
-import { Search, MapPin, Star, Calendar, AlertCircle, Clock, Globe, Loader2 } from 'lucide-react';
+import { Search, MapPin, Star, Calendar, AlertCircle, Clock, Globe, Loader2, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
@@ -15,6 +15,14 @@ const Marketplace = () => {
   const [filterRole, setFilterRole] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDataLoading, setIsDataLoading] = useState(false);
+
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [locationTypeFilter, setLocationTypeFilter] = useState<'ALL' | 'FIXED' | 'FLEXIBLE'>('ALL');
+  const [sortBy, setSortBy] = useState<'NEWEST' | 'PRICE_ASC' | 'PRICE_DESC'>('NEWEST');
+  const hasActiveFilters = minPrice !== '' || maxPrice !== '' || locationTypeFilter !== 'ALL' || sortBy !== 'NEWEST';
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,7 +52,7 @@ const Marketplace = () => {
   const [userCeremonies, setUserCeremonies] = useState<Ceremony[]>([]); // For both General User and Organizer
   const [selectedCeremonyId, setSelectedCeremonyId] = useState<string>(''); // Selected for booking
 
-  // --- Search Debounce Logic ---
+  // --- Search & Price Debounce Logic ---
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
         setCurrentPage(1); // Reset to page 1 on new search
@@ -52,12 +60,12 @@ const Marketplace = () => {
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery, minPrice, maxPrice]);
 
   // --- Filter/Pagination Change Logic ---
   useEffect(() => {
     loadData();
-  }, [user, currentPage, filterRole]);
+  }, [user, currentPage, filterRole, locationTypeFilter, sortBy]);
 
   // Fetch provider schedule when a service is selected for booking
   useEffect(() => {
@@ -69,7 +77,13 @@ const Marketplace = () => {
   const loadData = async () => {
       setIsDataLoading(true);
       const roleArg = filterRole !== 'ALL' ? filterRole as UserRole : undefined;
-      const srvRes = await getServices(roleArg, currentPage, 9, searchQuery);
+      const filters: ServiceFilters = {
+          minPrice: minPrice !== '' ? Number(minPrice) : undefined,
+          maxPrice: maxPrice !== '' ? Number(maxPrice) : undefined,
+          locationType: locationTypeFilter !== 'ALL' ? locationTypeFilter : undefined,
+          sort: sortBy
+      };
+      const srvRes = await getServices(roleArg, currentPage, 9, searchQuery, filters);
       setServices(srvRes.data);
       setTotalPages(srvRes.totalPages);
 
@@ -198,30 +212,107 @@ const Marketplace = () => {
   return (
     <div className="space-y-8">
         {/* Header & Filter */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <div className="relative w-full md:w-96">
-                <Search className={`absolute left-3 top-3 w-5 h-5 ${isDataLoading ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`} />
-                <input 
-                    type="text" 
-                    placeholder="ស្វែងរកចុងភៅ, សម្អាងការ..." 
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 transition-all"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                />
-            </div>
-            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar">
-                {['ALL', UserRole.BEAUTY_SALON, UserRole.CHEF, UserRole.HALL, UserRole.MUSIC_BAND].map(role => (
-                    <button 
-                        key={role}
-                        onClick={() => { setFilterRole(role); setCurrentPage(1); }}
-                        className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
-                            filterRole === role ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="relative w-full md:w-96">
+                    <Search className={`absolute left-3 top-3 w-5 h-5 ${isDataLoading ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`} />
+                    <input
+                        type="text"
+                        placeholder="ស្វែងរកចុងភៅ, សម្អាងការ..."
+                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar items-center">
+                    {['ALL', UserRole.BEAUTY_SALON, UserRole.CHEF, UserRole.HALL, UserRole.MUSIC_BAND].map(role => (
+                        <button
+                            key={role}
+                            onClick={() => { setFilterRole(role); setCurrentPage(1); }}
+                            className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
+                                filterRole === role ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            {roleLabels[role]}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`relative p-2 rounded-full transition-all flex-shrink-0 ${
+                            showFilters || hasActiveFilters ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-transparent'
                         }`}
+                        title="តម្រង"
                     >
-                        {roleLabels[role]}
+                        <SlidersHorizontal size={18} />
+                        {hasActiveFilters && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>}
                     </button>
-                ))}
+                </div>
             </div>
+
+            {showFilters && (
+                <div className="flex flex-col md:flex-row gap-4 md:items-end pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="flex-1 flex gap-3">
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">តម្លៃចាប់ពី ($)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 transition-all text-sm"
+                                value={minPrice}
+                                onChange={e => setMinPrice(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">តម្លៃដល់ ($)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="គ្មានកំណត់"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 transition-all text-sm"
+                                value={maxPrice}
+                                onChange={e => setMaxPrice(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">ប្រភេទទីតាំង</label>
+                        <div className="flex gap-1.5">
+                            {([['ALL', 'ទាំងអស់'], ['FIXED', 'ទីតាំងថេរ'], ['FLEXIBLE', 'ចល័ត']] as const).map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    onClick={() => { setLocationTypeFilter(value); setCurrentPage(1); }}
+                                    className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                                        locationTypeFilter === value ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">តម្រៀបតាម</label>
+                        <select
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 transition-all text-sm bg-white"
+                            value={sortBy}
+                            onChange={e => { setSortBy(e.target.value as any); setCurrentPage(1); }}
+                        >
+                            <option value="NEWEST">ថ្មីបំផុត</option>
+                            <option value="PRICE_ASC">តម្លៃ៖ ទាបទៅខ្ពស់</option>
+                            <option value="PRICE_DESC">តម្លៃ៖ ខ្ពស់ទៅទាប</option>
+                        </select>
+                    </div>
+                    {hasActiveFilters && (
+                        <button
+                            onClick={() => { setMinPrice(''); setMaxPrice(''); setLocationTypeFilter('ALL'); setSortBy('NEWEST'); setCurrentPage(1); }}
+                            className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-rose-600 px-3 py-2.5 rounded-lg hover:bg-rose-50 transition-colors whitespace-nowrap"
+                        >
+                            <X size={14} /> សម្អាតតម្រង
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
 
         {/* Services Grid */}

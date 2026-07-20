@@ -263,7 +263,14 @@ const saveLocalServices = (services: Service[]) => {
     localStorage.setItem('pithi_local_services', JSON.stringify(services));
 };
 
-export const getServices = async (role?: UserRole, page = 1, limit = 10, search?: string): Promise<PaginatedResponse<Service>> => {
+export interface ServiceFilters {
+    minPrice?: number;
+    maxPrice?: number;
+    locationType?: 'FIXED' | 'FLEXIBLE';
+    sort?: 'NEWEST' | 'PRICE_ASC' | 'PRICE_DESC';
+}
+
+export const getServices = async (role?: UserRole, page = 1, limit = 10, search?: string, filters?: ServiceFilters): Promise<PaginatedResponse<Service>> => {
     const handleLocalGet = (): PaginatedResponse<Service> => {
         let local = getLocalServices();
         if (role) {
@@ -273,13 +280,28 @@ export const getServices = async (role?: UserRole, page = 1, limit = 10, search?
             const cleanSearch = search.toLowerCase();
             local = local.filter(s => (s.name || '').toLowerCase().includes(cleanSearch) || (s.providerName || '').toLowerCase().includes(cleanSearch));
         }
-        
-        local.sort((a, b) => b.id.localeCompare(a.id));
-        
+        if (filters?.minPrice !== undefined) {
+            local = local.filter(s => s.price >= filters.minPrice!);
+        }
+        if (filters?.maxPrice !== undefined) {
+            local = local.filter(s => s.price <= filters.maxPrice!);
+        }
+        if (filters?.locationType) {
+            local = local.filter(s => (s.locationType || 'FIXED') === filters.locationType);
+        }
+
+        if (filters?.sort === 'PRICE_ASC') {
+            local.sort((a, b) => a.price - b.price);
+        } else if (filters?.sort === 'PRICE_DESC') {
+            local.sort((a, b) => b.price - a.price);
+        } else {
+            local.sort((a, b) => b.id.localeCompare(a.id));
+        }
+
         const from = (page - 1) * limit;
         const to = from + limit;
         const pageData = local.slice(from, to);
-        
+
         return {
             data: pageData,
             total: local.length,
@@ -295,15 +317,25 @@ export const getServices = async (role?: UserRole, page = 1, limit = 10, search?
 
     try {
         let query = supabase.from('services').select('*', { count: 'exact' });
-        
+
         if (role) query = query.eq('role', role);
-        
+
         if (search) {
             query = query.or(`name.ilike.%${search}%,providerName.ilike.%${search}%`);
         }
-        
-        query = query.order('id', { ascending: false });
-        
+
+        if (filters?.minPrice !== undefined) query = query.gte('price', filters.minPrice);
+        if (filters?.maxPrice !== undefined) query = query.lte('price', filters.maxPrice);
+        if (filters?.locationType) query = query.eq('locationType', filters.locationType);
+
+        if (filters?.sort === 'PRICE_ASC') {
+            query = query.order('price', { ascending: true });
+        } else if (filters?.sort === 'PRICE_DESC') {
+            query = query.order('price', { ascending: false });
+        } else {
+            query = query.order('id', { ascending: false });
+        }
+
         const from = (page - 1) * limit;
         const to = from + limit - 1;
         query = query.range(from, to);

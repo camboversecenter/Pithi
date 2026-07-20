@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { Ceremony, Transaction, ReportedTransaction } from '../../types';
 import { addTransaction, deleteTransaction, confirmReportedTransaction, rejectReportedTransaction } from '../../services/dataService';
+import { downloadCsv, openPrintView } from '../../services/exportService';
 import { Card, Button, Modal, Input, Select } from '../UIComponents';
-import { Plus, AlertCircle, Eye, Check, X, TrendingUp, TrendingDown, Trash2, Wallet, AlertTriangle } from 'lucide-react';
+import { Plus, AlertCircle, Eye, Check, X, TrendingUp, TrendingDown, Trash2, Wallet, AlertTriangle, Download, Printer } from 'lucide-react';
 import { useGlobalDialog } from '../../contexts/GlobalDialogContext';
 
 interface OwnerBudgetProps {
@@ -89,6 +90,38 @@ const OwnerBudget: React.FC<OwnerBudgetProps> = ({ ceremony, transactions, pendi
         } catch (error: any) {
             await showAlert("បរាជ័យ", error.message || "មិនអាចបន្ថែមប្រតិបត្តិការឡើយ។", "danger");
         }
+    };
+
+    const handleExportCsv = () => {
+        downloadCsv(
+            `finance_${ceremony.title.replace(/\s+/g, '_')}.csv`,
+            ['កាលបរិច្ឆេទ', 'ប្រភេទ', 'ចំណាត់ថ្នាក់', 'បរិយាយ / ម្ចាស់ចំណងដៃ', 'ចំនួន ($)'],
+            transactions.map(t => [
+                new Date(t.date).toLocaleDateString('km-KH'),
+                t.type === 'INCOME' ? 'ចំណូល' : t.type === 'EXPENSE' ? 'ចំណាយ' : 'ចំណងដៃ',
+                categoryLabels[t.category || ''] || t.category || '',
+                t.expenseName || t.donorName || '',
+                t.amount
+            ])
+        );
+    };
+
+    // Traditional gift ledger (កំណត់ចំណងដៃ) — confirmed gifts only
+    const handlePrintGiftLedger = () => {
+        const gifts = transactions.filter(t => t.type === 'INCOME' && (t.category === 'Gift' || t.donorName));
+        const total = gifts.reduce((acc, t) => acc + t.amount, 0);
+        openPrintView(
+            'កំណត់ចំណងដៃ',
+            `${ceremony.title} • ${new Date(ceremony.date).toLocaleDateString('km-KH')}`,
+            ['ល.រ', 'ឈ្មោះ', 'បរិយាយ', 'ចំនួន ($)'],
+            gifts.map((t, i) => [
+                i + 1,
+                t.donorName || t.expenseName || '—',
+                t.giftDescription || '',
+                t.amount.toFixed(2)
+            ]),
+            `សរុប៖ $${total.toFixed(2)} (${gifts.length} ចំណងដៃ)`
+        );
     };
 
     const handleDeleteTx = async (id: string) => {
@@ -223,7 +256,25 @@ const OwnerBudget: React.FC<OwnerBudgetProps> = ({ ceremony, transactions, pendi
                 </div>
             )}
 
-            <Card title="ប្រតិបត្តិការហិរញ្ញវត្ថុ" action={<Button onClick={() => setIsTxModalOpen(true)}><Plus size={18} className="mr-2"/> បន្ថែម</Button>}>
+            <Card title="ប្រតិបត្តិការហិរញ្ញវត្ថុ" action={
+                <div className="flex items-center gap-1.5">
+                    <button
+                        onClick={handlePrintGiftLedger}
+                        className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        title="បោះពុម្ពកំណត់ចំណងដៃ"
+                    >
+                        <Printer size={18} />
+                    </button>
+                    <button
+                        onClick={handleExportCsv}
+                        className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        title="នាំចេញ CSV"
+                    >
+                        <Download size={18} />
+                    </button>
+                    <Button onClick={() => setIsTxModalOpen(true)}><Plus size={18} className="mr-2"/> បន្ថែម</Button>
+                </div>
+            }>
                 <div className="space-y-3">
                     {transactions.length > 0 ? transactions.map(t => (
                         <div key={t.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg border border-transparent hover:border-slate-100 transition-all">

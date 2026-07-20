@@ -388,6 +388,57 @@ create policy "Allow admin delete profiles"
     on public.users for delete
     using (public.get_my_role() = 'ADMIN');
 
+-- --------------------------------------------------------------------
+-- ROLE INTEGRITY GUARD
+-- --------------------------------------------------------------------
+-- The self-update policy above lets users edit their own profile (name,
+-- avatar). Without this guard they could also flip their own "role" column
+-- to 'ADMIN' — a privilege-escalation hole, since anyone holds the public
+-- anon key. This trigger enforces that only an administrator (or the super
+-- admin, identified by verified OAuth email) can assign or change a role.
+-- --------------------------------------------------------------------
+create or replace function public.enforce_user_role_integrity()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    actor_role text;
+    actor_email text;
+    is_privileged boolean;
+begin
+    -- Trusted direct-database / service-role contexts have no end-user JWT.
+    -- RLS already blocks anonymous end-user writes, so skip enforcement here
+    -- (this keeps seed scripts and admin tasks working).
+    if auth.uid() is null then
+        return new;
+    end if;
+
+    actor_email := auth.jwt() ->> 'email';
+    select role into actor_role from public.users where id = auth.uid();
+    is_privileged := (actor_role = 'ADMIN') or (actor_email = 'pithi.deva@gmail.com');
+
+    if tg_op = 'INSERT' then
+        if new.role = 'ADMIN' and not is_privileged then
+            raise exception 'Only administrators may assign the ADMIN role.';
+        end if;
+        return new;
+    end if;
+
+    -- UPDATE: a role change is only permitted for privileged actors.
+    if new.role is distinct from old.role and not is_privileged then
+        raise exception 'You are not allowed to change your account role.';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_user_role_integrity on public.users;
+create trigger trg_enforce_user_role_integrity
+    before insert or update on public.users
+    for each row execute function public.enforce_user_role_integrity();
+
 
 -- --------------------------------------------------------------------
 -- ceremonies TABLE POLICIES
@@ -835,15 +886,22 @@ language plpgsql
 security definer
 as $$
 begin
-    insert into public.users (id, name, email, role, "avatarUrl")
-    values (
-        new.id,
-        coalesce(new.raw_user_meta_data->>'full_name', new.email),
-        new.email,
-        'GENERAL_USER',
-        coalesce(new.raw_user_meta_data->>'avatar_url', '')
-    )
-    on conflict (id) do nothing;
+    -- Only auto-provision the super administrator. Every other new user is left
+    -- without a profile so the app shows the Role Selection screen, and their
+    -- profile is created with the role they choose (via completeRegistration).
+    -- Auto-inserting everyone as GENERAL_USER here would silently bypass role
+    -- selection and lock all new accounts to GENERAL_USER.
+    if new.email = 'pithi.deva@gmail.com' then
+        insert into public.users (id, name, email, role, "avatarUrl")
+        values (
+            new.id,
+            coalesce(new.raw_user_meta_data->>'full_name', 'Super Admin'),
+            new.email,
+            'ADMIN',
+            coalesce(new.raw_user_meta_data->>'avatar_url', '')
+        )
+        on conflict (id) do update set role = 'ADMIN';
+    end if;
     return new;
 end;
 $$;

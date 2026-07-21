@@ -52,7 +52,7 @@ const RoleSelection = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col md:items-center md:justify-center md:p-4">
-            <div className="relative w-full h-screen h-[100dvh] md:h-auto md:max-w-4xl bg-white overflow-hidden flex flex-col md:flex-row md:rounded-3xl md:shadow-xl md:border md:border-slate-100">
+            <div className="relative w-full min-h-[100dvh] md:min-h-0 md:h-auto md:max-w-4xl bg-white md:overflow-hidden flex flex-col md:flex-row md:rounded-3xl md:shadow-xl md:border md:border-slate-100">
 
                 {/* Sidebar Info */}
                 <div className="md:w-1/3 bg-slate-900 p-8 text-white flex flex-col justify-between shrink-0">
@@ -75,8 +75,8 @@ const RoleSelection = () => {
                 </div>
 
                 {/* Selection Area */}
-                <div className="relative md:w-2/3 p-8 flex-1 min-h-0 flex flex-col">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0 overflow-y-auto pr-2 pb-4 scroll-smooth md:flex-none md:max-h-[60vh] md:pb-20">
+                <div className="relative md:w-2/3 p-8 md:flex-1 md:min-h-0 md:flex md:flex-col">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-36 scroll-smooth md:flex-none md:max-h-[60vh] md:overflow-y-auto md:pr-2 md:pb-20">
                         {roles.map((item) => (
                             <button
                                 key={item.role}
@@ -99,7 +99,7 @@ const RoleSelection = () => {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="shrink-0 bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-slate-100 flex flex-col gap-3 md:absolute md:inset-x-0 md:bottom-0 md:pb-6">
+                    <div className="fixed inset-x-0 bottom-0 z-20 bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] border-t border-slate-100 flex flex-col gap-3 md:absolute md:z-auto md:inset-x-0 md:bottom-0 md:pb-6">
                        {errorMsg && (
                            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 flex items-start">
                                <AlertCircle size={15} className="mr-2 flex-shrink-0 mt-0.5"/>

@@ -188,7 +188,7 @@ const Login = () => {
                             <li>បន្ថែមអ៊ីមែលរបស់អ្នកទៅក្នុងបញ្ជី <strong>Test users</strong> បើស្ថិតក្នុងទម្រង់ Testing។</li>
                         </ol>
                         <div className="pt-1.5 border-t text-[10px] text-slate-500 leading-relaxed italic">
-                            *សូមប្រាកដថា Authorized Redirect URI ត្រូវគ្នាជាមួយ Supabase Callback URL: <code className="bg-slate-150 p-0.5 rounded font-mono break-all font-bold">https://fioumbuhowumfjptjzfy.supabase.co/auth/v1/callback</code>
+                            *សូមប្រាកដថា Authorized Redirect URI ត្រូវគ្នាជាមួយ Supabase Callback URL: <code className="bg-slate-150 p-0.5 rounded font-mono break-all font-bold">https://tkhdcccgvwpnhqgxhymg.supabase.co/auth/v1/callback</code>
                         </div>
                     </div>
                 </details>

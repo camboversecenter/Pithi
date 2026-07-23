@@ -468,12 +468,9 @@ export const createService = async (data: Partial<Service>): Promise<Service> =>
     }
 
     try {
-        const { data: result, error } = await supabase.from('services').insert({
-            ...data,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
-        }).select().single();
+        const { data: result, error } = await supabase.from('services')
+            .insert(stripClientTimestamps(data))
+            .select().single();
         if (error) throw error;
         return result as Service;
     } catch (err) {
@@ -507,10 +504,9 @@ export const updateService = async (id: string, data: Partial<Service>): Promise
     }
 
     try {
-        const { data: result, error } = await supabase.from('services').update({
-            ...data,
-            updatedAt: new Date().toISOString()
-        }).eq('id', id).select().single();
+        const { data: result, error } = await supabase.from('services')
+            .update(stripClientTimestamps(data))
+            .eq('id', id).select().single();
         if (error) throw error;
         return result as Service;
     } catch (err) {
@@ -971,17 +967,13 @@ export const createBooking = async (data: Partial<Booking>): Promise<Booking> =>
 
     try {
         const { data: result, error } = await supabase.from('bookings').insert({
-            ...data,
-            status: BookingStatus.PENDING,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            ...stripClientTimestamps(data),
+            status: BookingStatus.PENDING
         }).select().single();
         if (error) throw error;
         return result as Booking;
     } catch (err) {
-        console.warn("createBooking Supabase error, falling back to local storage:", err);
-        return fallbackCreate();
+        return surfaceOrFallback('createBooking', err, fallbackCreate);
     }
 };
 
@@ -1013,10 +1005,7 @@ export const updateBookingStatus = async (id: string, status: BookingStatus): Pr
     }
 
     try {
-        const { error } = await supabase.from('bookings').update({
-            status,
-            updatedAt: new Date().toISOString()
-        }).eq('id', id);
+        const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
         if (error) throw error;
     } catch (err) {
         // A double-booking rejection from the DB trigger is a real answer,
@@ -1062,11 +1051,10 @@ export const updateBookingSchedule = async (id: string, date: string, startTime:
     if (isLocalMode()) return fallbackUpdate();
 
     try {
-        const { data, error } = await supabase.from('bookings').update({ 
-            date, 
-            startTime, 
-            endTime,
-            updatedAt: new Date().toISOString()
+        const { data, error } = await supabase.from('bookings').update({
+            date,
+            startTime,
+            endTime
         }).eq('id', id).select('*, ceremonies(title)').single();
         if (error) throw error;
         
@@ -1145,11 +1133,8 @@ export const addBookingComment = async (bookingId: string, userId: string, userN
 
     try {
         const { data, error } = await supabase.from('booking_comments').insert({
-            bookingId, userId, userName, role, content, 
-            timestamp: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            bookingId, userId, userName, role, content,
+            timestamp: new Date().toISOString()
         }).select().single();
         if (error) throw error;
         return data as BookingComment;
@@ -1202,11 +1187,8 @@ const addBookingLog = async (bookingId: string, action: string, details: string,
 
     try {
         const { error } = await supabase.from('booking_logs').insert({
-            bookingId, action, details, userId, userName, 
-            timestamp: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            bookingId, action, details, userId, userName,
+            timestamp: new Date().toISOString()
         });
         if (error) throw error;
     } catch (err) {
@@ -1275,11 +1257,8 @@ export const addGuest = async (data: Partial<Guest>): Promise<Guest> => {
 
     try {
         const { data: result, error } = await supabase.from('guests').insert({
-            ...data,
-            status: data.status || GuestStatus.PENDING,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            ...stripClientTimestamps(data),
+            status: data.status || GuestStatus.PENDING
         }).select().single();
         if (error) throw error;
         return result as Guest;
@@ -1305,8 +1284,7 @@ export const setGuestCheckIn = async (guestId: string, checkedIn: boolean): Prom
 
     try {
         const { data, error } = await supabase.from('guests').update({
-            checkedInAt,
-            updatedAt: new Date().toISOString()
+            checkedInAt
         }).eq('id', guestId).select().single();
         if (error) throw error;
         return data as Guest;
@@ -1522,19 +1500,15 @@ export const saveInvitationTemplate = async (data: Partial<InvitationTemplate>):
 
     try {
         if (data.id) {
-            const { data: res, error } = await supabase.from('invitation_templates').update({
-                ...data,
-                updatedAt: new Date().toISOString()
-            }).eq('id', data.id).select().single();
+            const { data: res, error } = await supabase.from('invitation_templates')
+                .update(stripClientTimestamps(data))
+                .eq('id', data.id).select().single();
             if (error) throw error;
             return res as InvitationTemplate;
         } else {
-            const { data: res, error } = await supabase.from('invitation_templates').insert({
-                ...data,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                deletedAt: null
-            }).select().single();
+            const { data: res, error } = await supabase.from('invitation_templates')
+                .insert(stripClientTimestamps(data))
+                .select().single();
             if (error) throw error;
             return res as InvitationTemplate;
         }
@@ -1626,12 +1600,9 @@ export const addTransaction = async (data: Partial<Transaction>): Promise<Transa
     if (isLocalMode()) return fallbackAdd();
 
     try {
-        const { data: result, error } = await supabase.from('transactions').insert({
-            ...data,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
-        }).select().single();
+        const { data: result, error } = await supabase.from('transactions')
+            .insert(stripClientTimestamps(data))
+            .select().single();
         if (error) throw error;
         return result as Transaction;
     } catch (err) {
@@ -1689,12 +1660,9 @@ export const reportTransaction = async (data: Partial<ReportedTransaction>): Pro
 
     try {
         const { data: result, error } = await supabase.from('reported_transactions').insert({
-            ...data,
+            ...stripClientTimestamps(data),
             status: 'PENDING',
-            timestamp: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            timestamp: new Date().toISOString()
         }).select().single();
         if (error) throw error;
         return result as ReportedTransaction;
@@ -1769,9 +1737,8 @@ export const confirmReportedTransaction = async (reportId: string): Promise<void
     }
 
     try {
-        const { data: report, error } = await supabase.from('reported_transactions').update({ 
-            status: 'CONFIRMED',
-            updatedAt: new Date().toISOString()
+        const { data: report, error } = await supabase.from('reported_transactions').update({
+            status: 'CONFIRMED'
         }).eq('id', reportId).select().single();
         if (error || !report) throw error || new Error('Report empty');
 
@@ -1857,11 +1824,8 @@ export const addReview = async (data: Partial<Review>): Promise<Review> => {
 
     try {
         const { data: result, error } = await supabase.from('reviews').insert({
-            ...data,
-            date: new Date().toISOString().split('T')[0],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            ...stripClientTimestamps(data),
+            date: new Date().toISOString().split('T')[0]
         }).select().single();
         if (error) throw error;
         return result as Review;
@@ -2088,10 +2052,8 @@ export const createSocialPost = async (data: Partial<SocialPost>): Promise<Socia
 
     try {
         const { data: result, error } = await supabase.from('social_posts').insert({
-            ...data,
+            ...stripClientTimestamps(data),
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null,
             likes: 0, useful: 0, fakes: 0, bookmarksCount: 0
         }).select().single();
         if (error) throw error;
@@ -2275,13 +2237,11 @@ export const addPostComment = async (postId: string, userId: string, userName: s
 
     try {
         const { data, error } = await supabase.from('post_comments').insert({
-            postId, 
-            authorId: userId, 
-            authorName: userName, 
-            content, 
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
+            postId,
+            authorId: userId,
+            authorName: userName,
+            content,
+            createdAt: new Date().toISOString()
         }).select().single();
         if (error) throw error;
         return data as PostComment;

@@ -11,6 +11,20 @@ const isLocalMode = () => {
     return !!localStorage.getItem('pithi_mock_user');
 };
 
+// For a real (signed-in) user, a database write error must surface to the UI
+// instead of silently falling back to browser storage — otherwise the write
+// looks successful but never persists to Supabase, and the list (which reads
+// from Supabase) never shows it. The localStorage fallback is kept only for
+// genuine local/demo mode.
+const surfaceOrFallback = <T>(context: string, err: any, fallback: () => T): T => {
+    if (!isLocalMode()) {
+        console.error(`${context} failed:`, err);
+        throw new Error(err?.message || `${context} failed`);
+    }
+    console.warn(`${context} local fallback:`, err);
+    return fallback();
+};
+
 const getLocalCeremonies = (): Ceremony[] => {
     try {
         const ceremoniesJson = localStorage.getItem('pithi_local_ceremonies');
@@ -167,8 +181,7 @@ export const createCeremony = async (data: Partial<Ceremony>): Promise<Ceremony>
         if (error) throw error;
         return result as Ceremony;
     } catch (err) {
-        console.warn("createCeremony Supabase error (possibly RLS), falling back to local storage:", err);
-        return fallbackCreate();
+        return surfaceOrFallback('createCeremony', err, fallbackCreate);
     }
 };
 
@@ -193,8 +206,7 @@ export const updateCeremony = async (id: string, data: Partial<Ceremony>): Promi
         if (error) throw error;
         return result as Ceremony;
     } catch (err) {
-        console.warn("updateCeremony Supabase error, falling back to local storage:", err);
-        return fallbackUpdate();
+        return surfaceOrFallback('updateCeremony', err, fallbackUpdate);
     }
 };
 
@@ -456,8 +468,7 @@ export const createService = async (data: Partial<Service>): Promise<Service> =>
         if (error) throw error;
         return result as Service;
     } catch (err) {
-        console.warn("createService Supabase error (RLS or otherwise), falling back to local storage:", err);
-        return fallbackCreate();
+        return surfaceOrFallback('createService', err, fallbackCreate);
     }
 };
 
@@ -494,8 +505,7 @@ export const updateService = async (id: string, data: Partial<Service>): Promise
         if (error) throw error;
         return result as Service;
     } catch (err) {
-        console.warn("updateService Supabase error, falling back to local storage:", err);
-        return fallbackUpdate();
+        return surfaceOrFallback('updateService', err, fallbackUpdate);
     }
 };
 

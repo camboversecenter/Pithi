@@ -2325,10 +2325,21 @@ export const getUserCalendarEvents = async (userId: string) => {
 };
 
 export const getRecentActivities = async (userId: string, role: UserRole) => {
-    let bookingQuery = supabase.from('bookings').select('*').order('createdAt', { ascending: false }).limit(5);
+    // Order by `date` — the bookings table has no camelCase `createdAt` column,
+    // so ordering by it returned nothing and the feed stayed empty.
+    let bookingQuery = supabase.from('bookings').select('*').order('date', { ascending: false }).limit(5);
     if (role === UserRole.ORGANIZER || role === UserRole.GENERAL_USER) bookingQuery = bookingQuery.eq('bookedByUserId', userId);
     else bookingQuery = bookingQuery.eq('providerId', userId);
     const { data: bookings } = await bookingQuery;
     if (!bookings) return [];
-    return bookings.map((b: Booking) => ({ id: b.id, description: `Booking: ${b.serviceName} (${b.status})`, timestamp: b.createdAt || new Date().toISOString(), isNew: false }));
+    const today = new Date().toISOString().split('T')[0];
+    return bookings.map((b: Booking) => ({
+        id: b.id,
+        description: `Booking: ${b.serviceName} (${b.status})`,
+        timestamp: b.date || new Date().toISOString(),
+        date: b.date,
+        // Past-dated bookings that were never completed/cancelled are "expired".
+        isExpired: !!b.date && b.date < today && b.status !== BookingStatus.COMPLETED && b.status !== BookingStatus.CANCELLED,
+        isNew: false
+    }));
 };

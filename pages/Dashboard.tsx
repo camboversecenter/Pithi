@@ -25,7 +25,7 @@ const Dashboard = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<{ id: string; date: string; type: 'OWNED' | 'INVITED'; title: string }[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [activities, setActivities] = useState<{id: string, description: string, timestamp: string, isNew: boolean}[]>([]);
+  const [activities, setActivities] = useState<{id: string, description: string, timestamp: string, isNew: boolean, isExpired?: boolean}[]>([]);
   const [stats, setStats] = useState({ activeCount: 0, clientCount: 0, pendingCount: 0, upcomingBookingCount: 0, income: 0, rating: 5.0 });
   const [vendorBookings, setVendorBookings] = useState<Booking[]>([]);
   
@@ -259,10 +259,17 @@ const Dashboard = () => {
                     <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-50 shadow-sm">
                         {activities.length > 0 ? (
                             activities.map((act) => (
-                                <div key={act.id} className="p-4 flex gap-4 items-start hover:bg-slate-50 transition-colors first:rounded-t-xl last:rounded-b-xl">
-                                    <div className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></div>
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-700 leading-relaxed">{act.description}</p>
+                                <div key={act.id} className={`p-4 flex gap-4 items-start transition-colors first:rounded-t-xl last:rounded-b-xl ${act.isExpired ? 'bg-slate-50/60 hover:bg-slate-100' : 'hover:bg-slate-50'}`}>
+                                    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${act.isExpired ? 'bg-slate-300' : 'bg-rose-500'}`}></div>
+                                    <div className="min-w-0">
+                                        <p className={`text-sm font-medium leading-relaxed ${act.isExpired ? 'text-slate-400' : 'text-slate-700'}`}>
+                                            {act.description}
+                                            {act.isExpired && (
+                                                <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wide align-middle">
+                                                    ផុតកំណត់
+                                                </span>
+                                            )}
+                                        </p>
                                         <p className="text-xs text-slate-400 mt-1">{new Date(act.timestamp).toLocaleDateString('km-KH')}</p>
                                     </div>
                                 </div>

@@ -25,6 +25,19 @@ const surfaceOrFallback = <T>(context: string, err: any, fallback: () => T): T =
     return fallback();
 };
 
+// The live database uses `created_at` (with a default) and maintains its
+// updated timestamp via trigger — it does NOT have camelCase createdAt /
+// updatedAt / deletedAt columns. Sending those keys makes every insert/update
+// fail with "column createdAt does not exist", so strip them before writing.
+const stripClientTimestamps = <T extends Record<string, any>>(obj: T): Partial<T> => {
+    const clean: Record<string, any> = {};
+    for (const key of Object.keys(obj || {})) {
+        if (key === 'createdAt' || key === 'updatedAt' || key === 'deletedAt') continue;
+        clean[key] = obj[key];
+    }
+    return clean as Partial<T>;
+};
+
 const getLocalCeremonies = (): Ceremony[] => {
     try {
         const ceremoniesJson = localStorage.getItem('pithi_local_ceremonies');
@@ -172,12 +185,9 @@ export const createCeremony = async (data: Partial<Ceremony>): Promise<Ceremony>
         return fallbackCreate();
     }
     try {
-        const { data: result, error } = await supabase.from('ceremonies').insert({
-            ...data,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deletedAt: null
-        }).select().single();
+        const { data: result, error } = await supabase.from('ceremonies')
+            .insert(stripClientTimestamps(data))
+            .select().single();
         if (error) throw error;
         return result as Ceremony;
     } catch (err) {
@@ -199,10 +209,9 @@ export const updateCeremony = async (id: string, data: Partial<Ceremony>): Promi
         return fallbackUpdate();
     }
     try {
-        const { data: result, error } = await supabase.from('ceremonies').update({
-            ...data,
-            updatedAt: new Date().toISOString()
-        }).eq('id', id).select().single();
+        const { data: result, error } = await supabase.from('ceremonies')
+            .update(stripClientTimestamps(data))
+            .eq('id', id).select().single();
         if (error) throw error;
         return result as Ceremony;
     } catch (err) {

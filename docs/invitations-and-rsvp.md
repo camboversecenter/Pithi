@@ -13,26 +13,46 @@ logged in**, but it also works for signed-in users (name auto-filled, captcha
 skipped).
 
 ### What loads
-`getCeremonyById` + `getInvitationTemplates`. If a `?type=` is present, the
-matching template overrides the ceremony's banner, message, and expiration date.
-If today is past the template's (or ceremony's) date, the invitation is marked
-**expired**.
+`getPublicInvitation` + `getInvitationTemplates`. A guest arriving from a shared
+link has no session, and Row-Level Security hides `ceremonies` from anonymous
+readers — so the page reads through the `get_public_invitation(uuid)`
+SECURITY DEFINER function, which returns only the fields an invitation needs
+(title, type, date, description, location, `mapUrl`, banner, message, theme,
+KHQR). Signed-in planners fall back to the ordinary row read.
+
+If a `?type=` is present, the matching template overrides the ceremony's banner,
+message, and expiration date. If today is past the template's (or ceremony's)
+date, the invitation is marked **expired**.
 
 ### The card
 An envelope-style card with a banner (or the ceremony's `themeColor`), a
 guest-type badge (VIP shows a crown), the ceremony title, the invitation message
-(Markdown), and a date/location/expiry block. A share bar offers native
-share / copy-link.
+(Markdown), and a date/location/expiry block. The location carries an **open in
+Google Maps** button — the owner's saved `mapUrl` when there is one, otherwise a
+Maps search built from the written address (`resolveMapLink`). A share bar offers
+native share / copy-link.
 
 ### RSVP flow
 - If expired → a red "invitation has expired" notice.
 - Otherwise a guest sees a form: an optional **business-card scanner**
   (`scanBusinessCard` OCR auto-fills name + phone), a name field, an optional
   phone field, and an **anti-spam math captcha**.
-- Submitting calls `addGuest({ ceremonyId, name, phoneNumber, guestType })` with a
-  default status of PENDING. There is a 60-second client-side rate limit
-  (`localStorage.last_rsvp_time`) and captcha validation for guests. Success shows
-  a thank-you confirmation.
+- Submitting calls `submitPublicRsvp(...)`, which runs the
+  `rsvp_to_ceremony(uuid, text, text, text)` SECURITY DEFINER function. That
+  function validates the name, rejects ceremonies that already happened,
+  de-duplicates a repeated submission by name + phone, and writes the guest with
+  status **ACCEPTED** — somebody filling in this form is confirming attendance,
+  not waiting to be asked. There is a 60-second client-side rate limit
+  (`localStorage.last_rsvp_time`) and captcha validation for guests.
+- Success shows a thank-you confirmation **and the guest's entry QR code** for
+  check-in at the door.
+
+**The owner is told.** The `notify_on_guest_added` trigger fires on insert and
+pushes a `GUEST_RSVP` notification (name + phone) to the ceremony's owner and
+organizer, linking to that ceremony's guest list. The pre-existing
+`notify_on_guest_rsvp` trigger only fired on UPDATE, which is why link RSVPs used
+to be completely silent. Everyone who signed up is visible in the
+**ភ្ញៀវ** tab of the Owner/Organizer portal, with their status and check-in state.
 
 This entry point is a **one-way "confirm attendance"** for people without
 accounts.
@@ -42,6 +62,11 @@ accounts.
 The authenticated guest's dashboard of ceremonies they were invited to. Requires
 login. A list view (tabs: current `UPCOMING` / past `PAST`, 9/page) and a detail
 view addressed by `?id=`.
+
+### Contacting the host
+The owner card in the detail view has a **ផ្ញើសារ** button that opens a direct
+message thread with the ceremony owner, and the location block links out to
+Google Maps using the same `resolveMapLink` helper.
 
 ### Two-way RSVP
 In the detail view, a pending invite offers **Attend** (`ចូលរួម` → ACCEPTED) and
@@ -65,8 +90,9 @@ budget income line (with KHR converted to USD at 1:4000).
 
 ## Related data / AI / storage functions
 
-Data: `getCeremonyById`, `getInvitationTemplates`, `addGuest`,
-`getMyInvitations`, `respondToInvitation`, `reportTransaction`,
-`getMyReportedTransactions`. AI: `scanBusinessCard`, `scanBankReceipt`. Storage:
+Data: `getPublicInvitation`, `submitPublicRsvp`, `getCeremonyById`,
+`getInvitationTemplates`, `addGuest`, `getMyInvitations`, `respondToInvitation`,
+`reportTransaction`, `getMyReportedTransactions`. AI: `scanBusinessCard`,
+`scanBankReceipt`. Maps: `resolveMapLink`. Storage:
 `uploadImage(file, 'receipts')`. Auth: `getUserById`, `getCurrentUser`.
 </content>

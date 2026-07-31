@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { getCeremonyById, addGuest, getInvitationTemplates } from '../services/dataService';
+import { getPublicInvitation, submitPublicRsvp, getInvitationTemplates } from '../services/dataService';
 import { getCurrentUser } from '../services/authService';
 import { generateGuestQr } from '../services/checkinService';
 import { scanBusinessCard } from '../services/geminiService';
 import { Ceremony, InvitationTemplate } from '../types';
+import { resolveMapLink } from '../services/mapsService';
 import { Input, MarkdownRenderer } from '../components/UIComponents';
-import { Calendar, MapPin, CheckCircle, Share2, Facebook, Link, Sparkles, Crown, AlertTriangle, Camera, Loader2, LogIn, ShieldAlert } from 'lucide-react';
+import { Calendar, MapPin, CheckCircle, Share2, Facebook, Link, Sparkles, Crown, AlertTriangle, Camera, Loader2, LogIn, ShieldAlert, Navigation } from 'lucide-react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const InvitationCard = () => {
@@ -42,7 +43,7 @@ const InvitationCard = () => {
     if (id) {
       setLoading(true);
       Promise.all([
-        getCeremonyById(id),
+        getPublicInvitation(id),
         getInvitationTemplates(id)
       ]).then(([c, templates]) => {
         setCeremony(c);
@@ -113,12 +114,12 @@ const InvitationCard = () => {
     setIsSubmitting(true);
 
     try {
-        // Add Guest (Data Service handles Duplicate Checks now)
-        const newGuest = await addGuest({
+        // Somebody filling in this form is confirming attendance — recording
+        // them as PENDING left the owner with no sign anything had happened.
+        const newGuest = await submitPublicRsvp({
             ceremonyId: ceremony.id,
-            name: name,
+            name,
             phoneNumber: guestPhone,
-            userId: user ? user.id : undefined,
             guestType: guestTypeParam || 'General'
         });
 
@@ -207,6 +208,8 @@ const InvitationCard = () => {
   if (!ceremony) return <div className="min-h-screen flex items-center justify-center font-serif text-slate-500">រកមិនឃើញកម្មវិធីនេះទេ។</div>;
 
   const themeColor = ceremony.themeColor || '#e11d48';
+  // Guests get a real map link — the saved one, or a search for the address.
+  const mapLink = resolveMapLink(ceremony.mapUrl, ceremony.location);
   
   // Use template specific data if available, otherwise default to ceremony data
   const bannerUrl = template?.bannerUrl || ceremony.bannerUrl;
@@ -279,9 +282,21 @@ const InvitationCard = () => {
                             <span className="font-medium text-lg">{ceremony.date}</span>
                         </div>
                         {ceremony.location && (
-                            <div className="flex items-center justify-center space-x-3 text-center">
-                                <MapPin className="w-5 h-5 text-rose-500 flex-shrink-0" />
-                                <span className="font-medium">{ceremony.location}</span>
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center justify-center space-x-3 text-center">
+                                    <MapPin className="w-5 h-5 text-rose-500 flex-shrink-0" />
+                                    <span className="font-medium">{ceremony.location}</span>
+                                </div>
+                                {mapLink && (
+                                    <a
+                                        href={mapLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:border-rose-300 hover:text-rose-600 transition-colors shadow-sm"
+                                    >
+                                        <Navigation size={12} /> បើកក្នុង Google Maps
+                                    </a>
+                                )}
                             </div>
                         )}
                         <div className="text-xs text-slate-400 mt-2 border-t border-slate-200 pt-2">
@@ -361,6 +376,7 @@ const InvitationCard = () => {
                                     <CheckCircle className="w-6 h-6 text-emerald-600" />
                                 </div>
                                 <p className="font-bold text-lg font-serif">អរគុណ! ការចូលរួមត្រូវបានកត់ត្រា។</p>
+                                <p className="text-xs text-emerald-700/80 mt-1">ម្ចាស់កម្មវិធីបានទទួលការជូនដំណឹងអំពីការឆ្លើយតបរបស់អ្នករួចហើយ។</p>
 
                                 {entryQr && (
                                     <div className="mt-5 pt-5 border-t border-emerald-100 w-full flex flex-col items-center">

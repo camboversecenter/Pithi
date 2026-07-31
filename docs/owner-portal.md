@@ -11,8 +11,13 @@ guest/invitation/plan tabs, same AI helpers — with two differences:
 1. There is **no Assign-Owner step**; `ownerId` is always the current user.
 2. It **adds a Budget tab** (`ថវិកា`), which is the owner's distinctive feature.
 
-The Overview, Guests, Invitations, and Plan tabs behave exactly as documented in
-[organizer-portal.md](organizer-portal.md). This page covers the Budget tab.
+The list view has the same **ខាងមុខ / កន្លងផុត / ទាំងអស់** tabs and status
+badges, the Overview tab adds a **message the organizer** card when somebody else
+set the event up, and the **ជូនដំណឹង** tab broadcasts to the ceremony's guests
+(see [messaging-and-announcements.md](messaging-and-announcements.md)).
+Otherwise the Overview, Guests, Invitations, and Plan tabs behave exactly as
+documented in [organizer-portal.md](organizer-portal.md). This page covers the
+Budget tab.
 
 ## Budget tab (`components/Owner/OwnerBudget.tsx`)
 

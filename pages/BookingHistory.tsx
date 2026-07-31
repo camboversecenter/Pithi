@@ -98,6 +98,11 @@ const BookingHistory = () => {
                        </td>
                        <td className="px-6 py-5 font-bold text-slate-800 align-top">
                          ${booking.price}
+                         {(booking.quantity || 1) > 1 && (
+                            <span className="block text-[11px] font-medium text-slate-400 mt-0.5">
+                                {booking.quantity} × ${booking.unitPrice ?? (booking.price / (booking.quantity || 1))}
+                            </span>
+                         )}
                        </td>
                        <td className="px-6 py-5 text-right align-top">
                          <Badge status={booking.status} />

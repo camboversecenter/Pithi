@@ -1,10 +1,12 @@
 
-import { 
-    Ceremony, Service, Booking, UserRole, Guest, BookingStatus, GuestStatus, 
-    Transaction, Invitation, InvitationTemplate, Review, BookingComment, 
-    BookingLog, ReportedTransaction, PaginatedResponse, SocialPost, PostReactionType, PostComment
+import {
+    Ceremony, Service, Booking, UserRole, Guest, BookingStatus, GuestStatus,
+    Transaction, Invitation, InvitationTemplate, Review, BookingComment,
+    BookingLog, ReportedTransaction, PaginatedResponse, SocialPost, PostReactionType, PostComment,
+    Announcement, AnnouncementAudience, ChatAttachmentType
 } from '../types';
 import { supabase } from './supabaseConfig';
+import { pushLocalNotification } from './notificationService';
 
 // --- HELPER ---
 const isLocalMode = () => {
@@ -161,7 +163,8 @@ export const createCeremony = async (data: Partial<Ceremony>): Promise<Ceremony>
         const newCeremony: Ceremony = {
             id: data.id || (crypto.randomUUID ? crypto.randomUUID() : `ceremony-${Date.now()}`),
             title: data.title || 'Untitled Ceremony',
-            type: data.type || 'WEDDING',
+            // Never assume a wedding — an unspecified type stays "other".
+            type: (data.type || '').trim() || 'ផ្សេងៗ',
             date: data.date || new Date().toISOString().split('T')[0],
             description: data.description || '',
             organizerId: data.organizerId || '',
@@ -935,10 +938,22 @@ export const getBookingById = async (id: string): Promise<Booking | null> => {
     }
 };
 
+// A booking's total is always unitPrice × quantity — vendors who charge per
+// table need the client to state how many, and the client needs to see what
+// that adds up to before committing.
+export const resolveBookingTotals = (data: Partial<Booking>, unitFallback?: number) => {
+    const quantity = Math.max(1, Math.round(Number(data.quantity) || 1));
+    const unitPrice = Number(
+        data.unitPrice ?? (data.quantity ? undefined : data.price) ?? unitFallback ?? data.price ?? 0
+    ) || 0;
+    return { quantity, unitPrice, price: Number((unitPrice * quantity).toFixed(2)) };
+};
+
 export const createBooking = async (data: Partial<Booking>): Promise<Booking> => {
     const fallbackCreate = () => {
         const local = getLocalBookings();
         const service = getLocalServices().find(s => s.id === data.serviceId);
+        const totals = resolveBookingTotals(data, service?.price);
         const newBooking: Booking = {
             id: 'b-' + Math.random().toString(36).substr(2, 9),
             serviceId: data.serviceId || '',
@@ -952,7 +967,9 @@ export const createBooking = async (data: Partial<Booking>): Promise<Booking> =>
             endTime: data.endTime || '',
             status: BookingStatus.PENDING,
             serviceName: data.serviceName || service?.name || 'Unknown Service',
-            price: data.price || service?.price || 0,
+            price: totals.price,
+            quantity: totals.quantity,
+            unitPrice: totals.unitPrice,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             deletedAt: null
@@ -965,15 +982,55 @@ export const createBooking = async (data: Partial<Booking>): Promise<Booking> =>
 
     if (isLocalMode()) return fallbackCreate();
 
+    const totals = resolveBookingTotals(data);
+
     try {
         const { data: result, error } = await supabase.from('bookings').insert({
             ...stripClientTimestamps(data),
+            ...totals,
             status: BookingStatus.PENDING
         }).select().single();
         if (error) throw error;
         return result as Booking;
     } catch (err) {
         return surfaceOrFallback('createBooking', err, fallbackCreate);
+    }
+};
+
+// Lets the client correct a booking they placed by mistake (wrong table count)
+// without cancelling and re-booking.
+export const updateBookingQuantity = async (id: string, quantity: number, userId: string, userName: string): Promise<Booking> => {
+    const existing = await getBookingById(id);
+    if (!existing) throw new Error('រកមិនឃើញការកក់នេះទេ។');
+
+    const totals = resolveBookingTotals({ ...existing, quantity }, existing.unitPrice ?? existing.price);
+
+    const fallbackUpdate = (): Booking => {
+        const local = getLocalBookings();
+        const index = local.findIndex(b => b.id === id);
+        if (index === -1) throw new Error('Booking not found');
+        local[index] = { ...local[index], ...totals, updatedAt: new Date().toISOString() };
+        saveLocalBookings(local);
+        addLocalBookingLog(id, 'QUANTITY_CHANGE', `Updated to ${totals.quantity} × $${totals.unitPrice}`, userId, userName);
+        return local[index];
+    };
+
+    if (isLocalMode()) return fallbackUpdate();
+
+    try {
+        const { data, error } = await supabase.from('bookings')
+            .update(totals)
+            .eq('id', id).select('*, ceremonies(title)').single();
+        if (error) throw error;
+
+        await addBookingLog(id, 'QUANTITY_CHANGE', `Updated to ${totals.quantity} × $${totals.unitPrice}`, userId, userName);
+
+        return {
+            ...data,
+            ceremonyTitle: (data as any).ceremonies?.title || 'Unknown Ceremony'
+        } as Booking;
+    } catch (err) {
+        return surfaceOrFallback('updateBookingQuantity', err, fallbackUpdate);
     }
 };
 
@@ -1109,7 +1166,14 @@ export const getBookingComments = async (bookingId: string): Promise<BookingComm
     }
 };
 
-export const addBookingComment = async (bookingId: string, userId: string, userName: string, role: UserRole, content: string): Promise<BookingComment> => {
+export const addBookingComment = async (
+    bookingId: string,
+    userId: string,
+    userName: string,
+    role: UserRole,
+    content: string,
+    attachment?: { url: string; type: ChatAttachmentType }
+): Promise<BookingComment> => {
     const fallbackAdd = () => {
         const local = getLocalBookingComments();
         const newComment: BookingComment = {
@@ -1119,6 +1183,8 @@ export const addBookingComment = async (bookingId: string, userId: string, userN
             userName,
             role,
             content,
+            attachmentUrl: attachment?.url,
+            attachmentType: attachment?.type || null,
             timestamp: new Date().toISOString(),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -1134,13 +1200,16 @@ export const addBookingComment = async (bookingId: string, userId: string, userN
     try {
         const { data, error } = await supabase.from('booking_comments').insert({
             bookingId, userId, userName, role, content,
+            attachmentUrl: attachment?.url || null,
+            attachmentType: attachment?.type || null,
             timestamp: new Date().toISOString()
         }).select().single();
         if (error) throw error;
         return data as BookingComment;
     } catch (err) {
-        console.warn("addBookingComment Supabase error, falling back to local storage:", err);
-        return fallbackAdd();
+        // The other party never sees a locally-stored comment — surface the
+        // failure instead of pretending the message was delivered.
+        return surfaceOrFallback('addBookingComment', err, fallbackAdd);
     }
 };
 
@@ -1253,7 +1322,11 @@ export const addGuest = async (data: Partial<Guest>): Promise<Guest> => {
         return newGuest;
     };
 
-    if (isLocalMode()) return fallbackAdd();
+    if (isLocalMode()) {
+        const guest = fallbackAdd();
+        notifyPlannersOfRsvpLocally(guest);
+        return guest;
+    }
 
     try {
         const { data: result, error } = await supabase.from('guests').insert({
@@ -1263,8 +1336,81 @@ export const addGuest = async (data: Partial<Guest>): Promise<Guest> => {
         if (error) throw error;
         return result as Guest;
     } catch (err) {
-        console.warn("addGuest Supabase error, falling back to local storage:", err);
-        return fallbackAdd();
+        // A guest who filled in the public invitation form must not be told
+        // "thank you" when the RSVP never reached the owner's database.
+        return surfaceOrFallback('addGuest', err, fallbackAdd);
+    }
+};
+
+// --- PUBLIC INVITATION FLOW (guests without an account) ---
+
+// A guest opening a shared link is not signed in, so row-level security hides
+// the ceremony from them and rejects a direct guest insert. Both steps go
+// through SECURITY DEFINER functions that expose only what an invitation needs.
+
+export const getPublicInvitation = async (ceremonyId: string): Promise<Ceremony | null> => {
+    if (isLocalMode()) return getLocalCeremonies().find(c => c.id === ceremonyId) || null;
+
+    try {
+        const { data, error } = await supabase.rpc('get_public_invitation', { p_ceremony: ceremonyId });
+        if (error) throw error;
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row) return row as Ceremony;
+    } catch (err) {
+        console.warn('get_public_invitation unavailable, trying a direct read:', err);
+    }
+
+    // Signed-in owners/organizers/guests can still read the row directly.
+    return getCeremonyById(ceremonyId);
+};
+
+export const submitPublicRsvp = async (data: {
+    ceremonyId: string;
+    name: string;
+    phoneNumber?: string;
+    guestType?: string;
+}): Promise<Guest> => {
+    if (isLocalMode()) {
+        const guest = await addGuest({ ...data, status: GuestStatus.ACCEPTED });
+        return guest;
+    }
+
+    const { data: result, error } = await supabase.rpc('rsvp_to_ceremony', {
+        p_ceremony: data.ceremonyId,
+        p_name: data.name,
+        p_phone: data.phoneNumber || '',
+        p_guest_type: data.guestType || 'General'
+    });
+
+    if (error) {
+        console.error('rsvp_to_ceremony failed:', error);
+        throw new Error(error.message || 'មិនអាចកត់ត្រាការចូលរួមបានទេ។');
+    }
+
+    const guest = (Array.isArray(result) ? result[0] : result) as Guest;
+    if (!guest) throw new Error('មិនអាចកត់ត្រាការចូលរួមបានទេ។');
+    return guest;
+};
+
+// Mirror of the notify_on_guest_added database trigger for the offline demo
+// mode, so the owner still sees the RSVP land in their inbox.
+const notifyPlannersOfRsvpLocally = (guest: Guest) => {
+    if (guest.status !== GuestStatus.ACCEPTED) return;
+    const ceremony = getLocalCeremonies().find(c => c.id === guest.ceremonyId);
+    if (!ceremony) return;
+    const body = `${guest.name}${guest.phoneNumber ? ` (${guest.phoneNumber})` : ''} បានបញ្ជាក់ការចូលរួម « ${ceremony.title} »។`;
+    for (const [userId, link] of [
+        [ceremony.ownerId, `/owner?ceremonyId=${ceremony.id}`],
+        [ceremony.organizerId, `/organizer?ceremonyId=${ceremony.id}`]
+    ] as const) {
+        if (!userId) continue;
+        pushLocalNotification({
+            userId,
+            type: 'GUEST_RSVP',
+            title: 'ភ្ញៀវថ្មីបានឆ្លើយតបការអញ្ជើញ',
+            body,
+            link
+        });
     }
 };
 
@@ -2251,6 +2397,112 @@ export const addPostComment = async (postId: string, userId: string, userName: s
     }
 };
 
+// --- ANNOUNCEMENTS ---
+
+const getLocalAnnouncements = (): Announcement[] => {
+    try {
+        return JSON.parse(localStorage.getItem('pithi_local_announcements') || '[]');
+    } catch {
+        return [];
+    }
+};
+
+const saveLocalAnnouncements = (announcements: Announcement[]) => {
+    localStorage.setItem('pithi_local_announcements', JSON.stringify(announcements));
+};
+
+export interface AnnouncementFilter {
+    ceremonyId?: string;
+    authorId?: string;
+}
+
+export const getAnnouncements = async (filter: AnnouncementFilter): Promise<Announcement[]> => {
+    const fallbackGet = () => getLocalAnnouncements()
+        .filter(a => (!filter.ceremonyId || a.ceremonyId === filter.ceremonyId)
+            && (!filter.authorId || a.authorId === filter.authorId))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    if (isLocalMode()) return fallbackGet();
+
+    try {
+        let query = supabase.from('announcements').select('*').is('deletedAt', null);
+        if (filter.ceremonyId) query = query.eq('ceremonyId', filter.ceremonyId);
+        if (filter.authorId) query = query.eq('authorId', filter.authorId);
+        const { data, error } = await query.order('createdAt', { ascending: false }).limit(50);
+        if (error) throw error;
+        return (data as Announcement[]) || [];
+    } catch (err) {
+        console.warn('getAnnouncements Supabase error, falling back to local storage:', err);
+        return fallbackGet();
+    }
+};
+
+export const createAnnouncement = async (data: {
+    authorId: string;
+    authorName: string;
+    authorRole: string;
+    audience: AnnouncementAudience;
+    ceremonyId?: string;
+    title: string;
+    message: string;
+}): Promise<Announcement> => {
+    if (!data.title.trim() || !data.message.trim()) {
+        throw new Error('សូមបញ្ចូលចំណងជើង និងខ្លឹមសារនៃសេចក្តីជូនដំណឹង។');
+    }
+    if (data.audience === 'CEREMONY_GUESTS' && !data.ceremonyId) {
+        throw new Error('សូមជ្រើសរើសកម្មវិធីមុនពេលផ្សាយសេចក្តីជូនដំណឹង។');
+    }
+
+    const fallbackCreate = (): Announcement => {
+        const all = getLocalAnnouncements();
+        const created: Announcement = {
+            ...data,
+            id: 'ann-' + Math.random().toString(36).slice(2, 11),
+            ceremonyId: data.ceremonyId || null,
+            recipientCount: 0,
+            createdAt: new Date().toISOString()
+        };
+        all.unshift(created);
+        saveLocalAnnouncements(all);
+        return created;
+    };
+
+    if (isLocalMode()) return fallbackCreate();
+
+    try {
+        const { data: result, error } = await supabase.from('announcements').insert({
+            authorId: data.authorId,
+            authorName: data.authorName,
+            authorRole: data.authorRole,
+            audience: data.audience,
+            ceremonyId: data.ceremonyId || null,
+            title: data.title.trim(),
+            message: data.message.trim()
+        }).select().single();
+        if (error) throw error;
+        return result as Announcement;
+    } catch (err) {
+        // Broadcasting is the whole point — a local-only copy would reach nobody.
+        return surfaceOrFallback('createAnnouncement', err, fallbackCreate);
+    }
+};
+
+export const deleteAnnouncement = async (id: string): Promise<void> => {
+    const fallbackDelete = () => saveLocalAnnouncements(getLocalAnnouncements().filter(a => a.id !== id));
+
+    if (isLocalMode()) {
+        fallbackDelete();
+        return;
+    }
+    try {
+        const { error } = await supabase.from('announcements').delete().eq('id', id);
+        if (error) throw error;
+    } catch (err) {
+        console.warn('deleteAnnouncement Supabase error, falling back to local storage:', err);
+        fallbackDelete();
+    }
+};
+
 // --- MISC & SYSTEM ---
 
 export const runCleanup = async () => {
@@ -2313,13 +2565,24 @@ export const getCleanupStats = async () => {
 
 export const getUserCalendarEvents = async (userId: string) => {
     const events: any[] = [];
-    const { data: owned } = await supabase.from('ceremonies').select('id, date, title').or(`ownerId.eq.${userId},organizerId.eq.${userId}`);
-    if (owned) owned.forEach((c: any) => events.push({ id: c.id, date: c.date, type: 'OWNED', title: c.title }));
+    const columns = 'id, date, title, bannerUrl, location';
+    const toEvent = (c: any, type: 'OWNED' | 'INVITED') => ({
+        id: c.id,
+        date: c.date,
+        type,
+        title: c.title,
+        bannerUrl: c.bannerUrl,
+        location: c.location,
+        status: getCeremonyStatus(c.date)
+    });
+
+    const { data: owned } = await supabase.from('ceremonies').select(columns).or(`ownerId.eq.${userId},organizerId.eq.${userId}`);
+    if (owned) owned.forEach((c: any) => events.push(toEvent(c, 'OWNED')));
     const { data: guests } = await supabase.from('guests').select('ceremonyId').eq('userId', userId).eq('status', GuestStatus.ACCEPTED);
     if (guests && guests.length > 0) {
         const ids = guests.map((g: any) => g.ceremonyId);
-        const { data: invited } = await supabase.from('ceremonies').select('id, date, title').in('id', ids);
-        if (invited) invited.forEach((c: any) => events.push({ id: c.id, date: c.date, type: 'INVITED', title: c.title }));
+        const { data: invited } = await supabase.from('ceremonies').select(columns).in('id', ids);
+        if (invited) invited.forEach((c: any) => events.push(toEvent(c, 'INVITED')));
     }
     return events;
 };
@@ -2338,8 +2601,82 @@ export const getRecentActivities = async (userId: string, role: UserRole) => {
         description: `Booking: ${b.serviceName} (${b.status})`,
         timestamp: b.date || new Date().toISOString(),
         date: b.date,
+        // Every activity opens the full booking record — the feed is a shortcut
+        // into the details, not the only thing the user gets to see.
+        link: `/booking/${b.id}`,
         // Past-dated bookings that were never completed/cancelled are "expired".
         isExpired: !!b.date && b.date < today && b.status !== BookingStatus.COMPLETED && b.status !== BookingStatus.CANCELLED,
         isNew: false
     }));
+};
+
+// --- CEREMONY STATUS HELPERS ---
+
+export type CeremonyTimeStatus = 'TODAY' | 'UPCOMING' | 'PAST';
+
+export const getCeremonyStatus = (date?: string): CeremonyTimeStatus => {
+    if (!date) return 'UPCOMING';
+    const today = new Date().toISOString().split('T')[0];
+    if (date === today) return 'TODAY';
+    return date < today ? 'PAST' : 'UPCOMING';
+};
+
+export const isCeremonyExpired = (date?: string) => getCeremonyStatus(date) === 'PAST';
+
+// --- AI ASSISTANT CONTEXT ---
+
+export interface AssistantSnapshot {
+    user: { name: string; role: UserRole };
+    today: string;
+    ceremonies: { id: string; title: string; type: string; date: string; location?: string; budget?: number; status: CeremonyTimeStatus }[];
+    bookings: { id: string; serviceName: string; date: string; startTime: string; endTime: string; status: BookingStatus; price: number; quantity?: number; ceremonyTitle?: string }[];
+    services: { id: string; name: string; providerName: string; role: UserRole; price: number; priceNote?: string; unitLabel?: string; location: string }[];
+}
+
+// Everything the assistant needs to answer questions about *this* user's
+// events instead of replying with generic wedding advice.
+export const getAssistantSnapshot = async (userId: string, role: UserRole, userName: string): Promise<AssistantSnapshot> => {
+    const today = new Date().toISOString().split('T')[0];
+    const ceremonyRole = role === UserRole.ORGANIZER ? UserRole.ORGANIZER : UserRole.GENERAL_USER;
+
+    const [ceremonies, bookings, services] = await Promise.all([
+        getCeremonies(userId, ceremonyRole, 1, 25, 'ALL').catch(() => ({ data: [] as Ceremony[] } as any)),
+        getBookings(userId, role, 1, 25, 'ALL').catch(() => ({ data: [] as Booking[] } as any)),
+        getServices(undefined, 1, 25).catch(() => ({ data: [] as Service[] } as any))
+    ]);
+
+    return {
+        user: { name: userName, role },
+        today,
+        ceremonies: (ceremonies.data as Ceremony[]).map(c => ({
+            id: String(c.id),
+            title: c.title,
+            type: c.type,
+            date: c.date,
+            location: c.location,
+            budget: c.budget,
+            status: getCeremonyStatus(c.date)
+        })),
+        bookings: (bookings.data as Booking[]).map(b => ({
+            id: String(b.id),
+            serviceName: b.serviceName,
+            date: b.date,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            status: b.status,
+            price: b.price,
+            quantity: b.quantity,
+            ceremonyTitle: b.ceremonyTitle
+        })),
+        services: (services.data as Service[]).map(s => ({
+            id: String(s.id),
+            name: s.name,
+            providerName: s.providerName,
+            role: s.role,
+            price: s.price,
+            priceNote: s.priceNote,
+            unitLabel: s.unitLabel,
+            location: s.location
+        }))
+    };
 };

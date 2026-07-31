@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getCurrentUser, getUserById } from '../services/authService';
 import { getMyInvitations, getCeremonyById, respondToInvitation, reportTransaction, getMyReportedTransactions } from '../services/dataService';
 import { generateGuestQr } from '../services/checkinService';
@@ -8,11 +8,13 @@ import { scanBankReceipt } from '../services/geminiService';
 import { uploadImage } from '../services/storageService';
 import { Invitation, Ceremony, GuestStatus, User, ReportedTransaction } from '../types';
 import { Card, Button, Pagination, Badge, Modal, Input, MarkdownRenderer } from '../components/UIComponents';
-import { Calendar, MapPin, ArrowLeft, Clock, CheckCircle, XCircle, RotateCcw, Map as MapIcon, User as UserIcon, ArrowRight, Gift, QrCode, Upload, Sparkles, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, ArrowLeft, Clock, CheckCircle, XCircle, RotateCcw, Map as MapIcon, User as UserIcon, ArrowRight, Gift, QrCode, Upload, Sparkles, Loader2, MessagesSquare } from 'lucide-react';
+import { resolveMapLink } from '../services/mapsService';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const InvitedCeremonies = () => {
     const user = getCurrentUser();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const ceremonyIdParam = searchParams.get('id');
     const { showAlert } = useGlobalDialog();
@@ -292,10 +294,19 @@ const InvitedCeremonies = () => {
                                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold">
                                          {owner?.name.charAt(0) || '?'}
                                      </div>
-                                     <div>
-                                         <p className="font-bold text-slate-800">{owner?.name || 'Unknown'}</p>
-                                         <p className="text-xs text-slate-500">{owner?.email}</p>
+                                     <div className="min-w-0 flex-1">
+                                         <p className="font-bold text-slate-800 truncate">{owner?.name || 'Unknown'}</p>
+                                         <p className="text-xs text-slate-500 truncate">{owner?.email}</p>
                                      </div>
+                                     {owner && owner.id !== user?.id && (
+                                         <Button
+                                             variant="outline"
+                                             className="text-xs px-3 py-2"
+                                             onClick={() => navigate(`/messages?with=${owner.id}`)}
+                                         >
+                                             <MessagesSquare size={14} className="mr-1.5"/> ផ្ញើសារ
+                                         </Button>
+                                     )}
                                  </div>
                              </div>
 
@@ -323,8 +334,12 @@ const InvitedCeremonies = () => {
                                      </div>
                                  </div>
                                  
-                                 {selectedCeremony.location && (
-                                     <Button variant="outline" className="w-full" onClick={() => window.open(`https://maps.google.com/?q=${selectedCeremony.location}`, '_blank')}>
+                                 {resolveMapLink(selectedCeremony.mapUrl, selectedCeremony.location) && (
+                                     <Button
+                                         variant="outline"
+                                         className="w-full"
+                                         onClick={() => window.open(resolveMapLink(selectedCeremony.mapUrl, selectedCeremony.location)!, '_blank', 'noopener')}
+                                     >
                                          <MapIcon size={16} className="mr-2"/> បើកផែនទី
                                      </Button>
                                  )}

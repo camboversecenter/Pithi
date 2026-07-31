@@ -8,7 +8,7 @@ import { AppNotification, NotificationType } from '../types';
 import { Card, Pagination } from '../components/UIComponents';
 import {
     ArrowLeft, Bell, BellOff, CalendarPlus, CalendarCheck, MessageSquare,
-    UserCheck, Star, Gift, CheckCheck, Trash2
+    UserCheck, Star, Gift, CheckCheck, Trash2, Send, Megaphone
 } from 'lucide-react';
 
 const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
@@ -17,7 +17,9 @@ const TYPE_ICONS: Record<NotificationType, React.ElementType> = {
     BOOKING_COMMENT: MessageSquare,
     GUEST_RSVP: UserCheck,
     REVIEW: Star,
-    GIFT_REPORTED: Gift
+    GIFT_REPORTED: Gift,
+    MESSAGE: Send,
+    ANNOUNCEMENT: Megaphone
 };
 
 const timeAgo = (iso: string): string => {

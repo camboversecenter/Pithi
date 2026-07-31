@@ -49,6 +49,7 @@ create table if not exists public.ceremonies (
     "organizerId" uuid references public.users(id) on delete set null,
     "ownerId" uuid references public.users(id) on delete set null,
     location text,
+    "mapUrl" text, -- Google Maps link shown on the digital invitation
     budget numeric(12, 2) default 0.00,
     "invitationMessage" text,
     "themeColor" text,
@@ -74,10 +75,13 @@ create table if not exists public.services (
     description text,
     price numeric(12, 2) not null,
     "priceNote" text,
+    "unitLabel" text, -- what one unit of `price` buys, e.g. តុ (table)
     location text not null,
     "locationType" text default 'FIXED' constraint check_location_type check ("locationType" in ('FIXED', 'FLEXIBLE')),
     "mapUrl" text,
     "imageUrl" text,
+    "paymentQrUrl" text, -- vendor's KHQR/bank QR for the client's deposit
+    "depositPercent" numeric(5, 2) default 50,
     "createdAt" timestamptz default now(),
     "updatedAt" timestamptz default now(),
     "deletedAt" timestamptz
@@ -91,14 +95,18 @@ create table if not exists public.bookings (
     "serviceId" bigint references public.services(id) on delete cascade not null,
     "ceremonyId" uuid references public.ceremonies(id) on delete cascade not null,
     "bookedByUserId" uuid references public.users(id) on delete set null not null,
+    "bookedByUserName" text, -- snapshot of the client's name at booking time
     "providerId" uuid references public.users(id) on delete set null not null,
+    "providerName" text,     -- snapshot of the provider's name at booking time
     date date not null,
     "startTime" text not null,
     "endTime" text not null,
     status text not null default 'PENDING'
         constraint check_booking_status check (status in ('PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED')),
     "serviceName" text not null,
-    price numeric(12, 2) not null,
+    price numeric(12, 2) not null, -- total = "unitPrice" × quantity
+    quantity integer not null default 1 constraint check_booking_quantity check (quantity >= 1),
+    "unitPrice" numeric(12, 2),
     "createdAt" timestamptz default now(),
     "updatedAt" timestamptz default now(),
     "deletedAt" timestamptz
@@ -114,6 +122,10 @@ create table if not exists public.booking_comments (
     "userName" text not null,
     role text not null,
     content text not null,
+    "attachmentUrl" text, -- photo or voice note shared in the negotiation
+    "attachmentType" text
+        constraint check_comment_attachment_type
+        check ("attachmentType" is null or "attachmentType" in ('IMAGE', 'AUDIO')),
     timestamp timestamptz default now(),
     "createdAt" timestamptz default now(),
     "updatedAt" timestamptz default now(),
@@ -985,7 +997,8 @@ create table if not exists public.notifications (
     type text not null
         constraint check_notification_type check (type in (
             'BOOKING_CREATED', 'BOOKING_STATUS', 'BOOKING_COMMENT',
-            'GUEST_RSVP', 'REVIEW', 'GIFT_REPORTED'
+            'GUEST_RSVP', 'REVIEW', 'GIFT_REPORTED',
+            'MESSAGE', 'ANNOUNCEMENT'
         )),
     title text not null,
     body text,
@@ -1182,6 +1195,48 @@ create trigger trg_notify_on_guest_rsvp
     after update on public.guests
     for each row execute function public.notify_on_guest_rsvp();
 
+-- A guest who arrives through a shared invitation link is INSERTed, never
+-- UPDATEd — without this trigger the owner never hears about sign-ups made
+-- outside the app.
+create or replace function public.notify_on_guest_added()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_ceremony public.ceremonies%rowtype;
+    v_body text;
+begin
+    if new.status <> 'ACCEPTED' then
+        return new; -- a planner adding a name to the list is not an RSVP
+    end if;
+
+    select * into v_ceremony from public.ceremonies where id = new."ceremonyId";
+    if found then
+        v_body := new.name
+            || coalesce(' (' || nullif(new."phoneNumber", '') || ')', '')
+            || ' បានបញ្ជាក់ការចូលរួម « ' || v_ceremony.title || ' »។';
+        perform public.push_notification(
+            v_ceremony."ownerId", 'GUEST_RSVP',
+            'ភ្ញៀវថ្មីបានឆ្លើយតបការអញ្ជើញ', v_body,
+            '/owner?ceremonyId=' || v_ceremony.id
+        );
+        perform public.push_notification(
+            v_ceremony."organizerId", 'GUEST_RSVP',
+            'ភ្ញៀវថ្មីបានឆ្លើយតបការអញ្ជើញ', v_body,
+            '/organizer?ceremonyId=' || v_ceremony.id
+        );
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_guest_added on public.guests;
+create trigger trg_notify_on_guest_added
+    after insert on public.guests
+    for each row execute function public.notify_on_guest_added();
+
 create or replace function public.notify_on_review_created()
 returns trigger
 language plpgsql
@@ -1304,3 +1359,324 @@ drop trigger if exists trg_enforce_booking_no_overlap on public.bookings;
 create trigger trg_enforce_booking_no_overlap
     before insert or update on public.bookings
     for each row execute function public.enforce_booking_no_overlap();
+
+
+-- ====================================================================
+-- 10. DIRECT MESSAGES (owner ↔ vendor ↔ organizer)
+-- ====================================================================
+-- A one-to-one thread that does not require a booking, so a client can
+-- negotiate terms with a provider (or an organizer with the event owner)
+-- before anything is committed. Photos and voice notes are stored in the
+-- PITHI bucket and referenced by URL.
+-- --------------------------------------------------------------------
+create table if not exists public.direct_messages (
+    id bigint primary key generated always as identity,
+    "senderId" uuid references public.users(id) on delete cascade not null,
+    "senderName" text not null,
+    "recipientId" uuid references public.users(id) on delete cascade not null,
+    "recipientName" text not null,
+    content text not null default '',
+    "attachmentUrl" text,
+    "attachmentType" text
+        constraint check_message_attachment_type
+        check ("attachmentType" is null or "attachmentType" in ('IMAGE', 'AUDIO')),
+    "isRead" boolean not null default false,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
+);
+
+create index if not exists idx_direct_messages_pair
+    on public.direct_messages ("senderId", "recipientId", "createdAt" desc);
+
+create index if not exists idx_direct_messages_inbox
+    on public.direct_messages ("recipientId", "isRead")
+    where "deletedAt" is null;
+
+alter table public.direct_messages enable row level security;
+
+create policy "Enable select own conversations"
+    on public.direct_messages for select
+    using (auth.uid() = "senderId" or auth.uid() = "recipientId");
+
+create policy "Enable send messages as self"
+    on public.direct_messages for insert
+    with check (auth.uid() = "senderId");
+
+create policy "Enable update own conversations"
+    on public.direct_messages for update
+    using (auth.uid() = "senderId" or auth.uid() = "recipientId")
+    with check (auth.uid() = "senderId" or auth.uid() = "recipientId");
+
+create policy "Enable delete own messages"
+    on public.direct_messages for delete
+    using (auth.uid() = "senderId");
+
+create or replace function public.notify_on_direct_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_preview text;
+begin
+    v_preview := case
+        when new."attachmentType" = 'IMAGE' then '📷 រូបភាព'
+        when new."attachmentType" = 'AUDIO' then '🎤 សារជាសំឡេង'
+        else left(new.content, 120)
+    end;
+    perform public.push_notification(
+        new."recipientId", 'MESSAGE',
+        'សារថ្មីពី ' || new."senderName",
+        v_preview,
+        '/messages?with=' || new."senderId"
+    );
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_on_direct_message on public.direct_messages;
+create trigger trg_notify_on_direct_message
+    after insert on public.direct_messages
+    for each row execute function public.notify_on_direct_message();
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime'
+          and schemaname = 'public'
+          and tablename = 'direct_messages'
+    ) then
+        alter publication supabase_realtime add table public.direct_messages;
+    end if;
+exception when undefined_object then
+    null; -- realtime is optional
+end;
+$$;
+
+
+-- ====================================================================
+-- 11. ANNOUNCEMENTS
+-- ====================================================================
+-- Event planners broadcast to the guests of one ceremony; vendors broadcast
+-- to every client who booked them. The fan-out trigger turns one row into a
+-- notification per recipient.
+-- --------------------------------------------------------------------
+create table if not exists public.announcements (
+    id bigint primary key generated always as identity,
+    "authorId" uuid references public.users(id) on delete cascade not null,
+    "authorName" text not null,
+    "authorRole" text not null,
+    audience text not null
+        constraint check_announcement_audience
+        check (audience in ('CEREMONY_GUESTS', 'VENDOR_CLIENTS')),
+    "ceremonyId" uuid references public.ceremonies(id) on delete cascade,
+    title text not null,
+    message text not null,
+    "recipientCount" integer not null default 0,
+    "createdAt" timestamptz default now(),
+    "updatedAt" timestamptz default now(),
+    "deletedAt" timestamptz
+);
+
+create index if not exists idx_announcements_author
+    on public.announcements ("authorId", "createdAt" desc);
+
+create index if not exists idx_announcements_ceremony
+    on public.announcements ("ceremonyId", "createdAt" desc);
+
+alter table public.announcements enable row level security;
+
+create policy "Enable select announcements for participants"
+    on public.announcements for select
+    using (
+        auth.uid() = "authorId"
+        or public.get_my_role() = 'ADMIN'
+        or (
+            audience = 'CEREMONY_GUESTS' and exists (
+                select 1 from public.ceremonies c
+                where c.id = "ceremonyId"
+                  and (
+                      c."organizerId" = auth.uid()
+                      or c."ownerId" = auth.uid()
+                      or exists (
+                          select 1 from public.guests g
+                          where g."ceremonyId" = c.id and g."userId" = auth.uid()
+                      )
+                  )
+            )
+        )
+        or (
+            audience = 'VENDOR_CLIENTS' and exists (
+                select 1 from public.bookings b
+                where b."providerId" = "authorId" and b."bookedByUserId" = auth.uid()
+            )
+        )
+    );
+
+create policy "Enable insert announcements for hosts"
+    on public.announcements for insert
+    with check (
+        auth.uid() = "authorId"
+        and (
+            (audience = 'CEREMONY_GUESTS' and exists (
+                select 1 from public.ceremonies c
+                where c.id = "ceremonyId"
+                  and (c."organizerId" = auth.uid() or c."ownerId" = auth.uid())
+            ))
+            or audience = 'VENDOR_CLIENTS'
+        )
+    );
+
+create policy "Enable delete own announcements"
+    on public.announcements for delete
+    using (auth.uid() = "authorId" or public.get_my_role() = 'ADMIN');
+
+create or replace function public.fanout_announcement()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_recipient uuid;
+    v_count integer := 0;
+    v_title text;
+begin
+    v_title := 'សេចក្តីជូនដំណឹងពី ' || new."authorName";
+
+    if new.audience = 'CEREMONY_GUESTS' then
+        for v_recipient in
+            select distinct g."userId"
+            from public.guests g
+            where g."ceremonyId" = new."ceremonyId"
+              and g."userId" is not null
+              and g."userId" <> new."authorId"
+        loop
+            perform public.push_notification(
+                v_recipient, 'ANNOUNCEMENT', v_title,
+                new.title || ' — ' || left(new.message, 160),
+                '/notifications'
+            );
+            v_count := v_count + 1;
+        end loop;
+
+        for v_recipient in
+            select unnest(array[c."ownerId", c."organizerId"])
+            from public.ceremonies c where c.id = new."ceremonyId"
+        loop
+            if v_recipient is not null and v_recipient <> new."authorId" then
+                perform public.push_notification(
+                    v_recipient, 'ANNOUNCEMENT', v_title,
+                    new.title || ' — ' || left(new.message, 160),
+                    '/notifications'
+                );
+            end if;
+        end loop;
+    else
+        for v_recipient in
+            select distinct b."bookedByUserId"
+            from public.bookings b
+            where b."providerId" = new."authorId"
+              and b.status in ('PENDING', 'CONFIRMED', 'COMPLETED')
+              and b."bookedByUserId" <> new."authorId"
+        loop
+            perform public.push_notification(
+                v_recipient, 'ANNOUNCEMENT', v_title,
+                new.title || ' — ' || left(new.message, 160),
+                '/notifications'
+            );
+            v_count := v_count + 1;
+        end loop;
+    end if;
+
+    update public.announcements set "recipientCount" = v_count where id = new.id;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_fanout_announcement on public.announcements;
+create trigger trg_fanout_announcement
+    after insert on public.announcements
+    for each row execute function public.fanout_announcement();
+
+
+-- ====================================================================
+-- 12. PUBLIC INVITATION ACCESS
+-- ====================================================================
+create or replace function public.get_public_invitation(p_ceremony uuid)
+returns table (
+    id uuid, title text, type text, date date, description text,
+    location text, "mapUrl" text, "bannerUrl" text,
+    "invitationMessage" text, "themeColor" text, "khqrUrl" text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select c.id, c.title, c.type, c.date, c.description,
+           c.location, c."mapUrl", c."bannerUrl",
+           c."invitationMessage", c."themeColor", c."khqrUrl"
+    from public.ceremonies c
+    where c.id = p_ceremony and c."deletedAt" is null;
+$$;
+
+grant execute on function public.get_public_invitation(uuid) to anon, authenticated;
+
+create or replace function public.rsvp_to_ceremony(
+    p_ceremony uuid, p_name text, p_phone text, p_guest_type text
+)
+returns public.guests
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_ceremony public.ceremonies%rowtype;
+    v_guest public.guests%rowtype;
+    v_name text := btrim(coalesce(p_name, ''));
+    v_phone text := nullif(btrim(coalesce(p_phone, '')), '');
+begin
+    if length(v_name) < 2 then
+        raise exception 'សូមបញ្ចូលឈ្មោះឱ្យបានត្រឹមត្រូវ។';
+    end if;
+
+    select * into v_ceremony from public.ceremonies where id = p_ceremony and "deletedAt" is null;
+    if not found then
+        raise exception 'រកមិនឃើញកម្មវិធីនេះទេ។';
+    end if;
+    if v_ceremony.date < current_date then
+        raise exception 'ការអញ្ជើញបានផុតកំណត់ហើយ។';
+    end if;
+
+    -- Tapping the link twice must not create two guests in the host's list.
+    select * into v_guest from public.guests
+    where "ceremonyId" = p_ceremony
+      and lower(name) = lower(v_name)
+      and coalesce("phoneNumber", '') = coalesce(v_phone, '')
+    limit 1;
+
+    if found then
+        update public.guests
+        set status = 'ACCEPTED', "updatedAt" = now()
+        where id = v_guest.id
+        returning * into v_guest;
+        return v_guest;
+    end if;
+
+    insert into public.guests ("ceremonyId", "userId", name, "phoneNumber", status, "guestType")
+    values (
+        p_ceremony, auth.uid(), v_name, v_phone, 'ACCEPTED',
+        coalesce(nullif(btrim(coalesce(p_guest_type, '')), ''), 'General')
+    )
+    returning * into v_guest;
+
+    return v_guest;
+end;
+$$;
+
+grant execute on function public.rsvp_to_ceremony(uuid, text, text, text) to anon, authenticated;
+

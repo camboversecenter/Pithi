@@ -18,6 +18,11 @@ The create/edit modal captures:
 - **Name** (`ឈ្មោះសេវាកម្ម`, required)
 - **Price** (`តម្លៃ ($)`, required) and an optional **price note**
   (`សម្គាល់តម្លៃ` — e.g. "per table", "starting from")
+- **Unit label** (`ឯកតាគិតថ្លៃ` — e.g. តុ/table, ថ្ងៃ/day) and **deposit
+  percent** (`ប្រាក់កក់ (%)`, default 50). The unit is what the client counts
+  when booking; the percentage drives the deposit shown to them.
+- **Payment QR** (`QR ទទួលប្រាក់កក់`) — the vendor's KHQR/bank image, shown to
+  the client on the booking page with the deposit amount worked out
 - **Location type** — `ទីតាំងថេរ` (FIXED) reveals **address** + **Google Maps
   URL** fields; `ចល័ត` (FLEXIBLE) marks it a mobile service
 - **Image** — upload with preview, or generate one with AI
@@ -52,6 +57,11 @@ The client-facing discovery surface, shown to non-vendor roles. It reads the
 current user but doesn't gate by role; however, **booking requires you to own at
 least one ceremony**.
 
+### Finding an organizer
+`ORGANIZER` is one of the role filters (and one of the roles allowed to publish a
+service), so event owners can find and book a planner in the same place they find
+a chef or a hall.
+
 ### Browsing
 - **Debounced search** (500 ms) over service name / provider name
   (`ស្វែងរកចុងភៅ, សម្អាងការ...`).
@@ -81,9 +91,16 @@ The "Book now" (`កក់ឥឡូវ`) modal captures:
   the chosen day
 - **Start / end time** (validated so end > start)
 
-On confirm, `createBooking(...)` records a new **PENDING** booking with a
-price snapshot from the service. If the user owns no ceremonies, an amber warning
-(`អ្នកមិនទាន់មានកម្មវិធីទេ...`) blocks booking.
+- **Quantity** — a stepper labelled with the service's unit (e.g. how many
+  tables). The modal shows the running **total** (`unitPrice × quantity`) and the
+  deposit that will be due.
+
+On confirm, `createBooking(...)` records a new **PENDING** booking with the
+quantity, the unit price snapshot, and the computed total. If the user owns no
+ceremonies, an amber warning (`អ្នកមិនទាន់មានកម្មវិធីទេ...`) blocks booking.
+
+Each card also carries a 💬 button that opens a direct thread with the provider,
+so price can be negotiated before (or instead of) booking.
 
 ### Empty states
 - No services: `រកមិនឃើញសេវាកម្មដែលអ្នកកំពុងស្វែងរកទេ។`

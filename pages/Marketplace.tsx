@@ -1,14 +1,16 @@
 
-import { getServices, createBooking, getCeremonies, getReviews, addReview, getBookingsByService, ServiceFilters } from '../services/dataService';
+import { getServices, createBooking, getCeremonies, getReviews, addReview, getBookingsByService, ServiceFilters, resolveBookingTotals } from '../services/dataService';
+import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../services/authService';
 import { Service, UserRole, Ceremony, Review, Booking, BookingStatus } from '../types';
 import { Button, Card, Modal, Input, Pagination, CalendarView, SearchableSelect } from '../components/UIComponents';
-import { Search, MapPin, Star, Calendar, AlertCircle, Clock, Globe, Loader2, SlidersHorizontal, X } from 'lucide-react';
+import { Search, MapPin, Star, Calendar, AlertCircle, Clock, Globe, Loader2, SlidersHorizontal, X, MessagesSquare, Minus, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const Marketplace = () => {
   const user = getCurrentUser();
+  const navigate = useNavigate();
   const { showAlert, showConfirm } = useGlobalDialog();
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -33,6 +35,8 @@ const Marketplace = () => {
   const [bookingDate, setBookingDate] = useState('');
   const [bookingStartTime, setBookingStartTime] = useState('08:00');
   const [bookingEndTime, setBookingEndTime] = useState('12:00');
+  // Vendors price per unit (a table, a day). The booking has to carry how many.
+  const [bookingQuantity, setBookingQuantity] = useState(1);
   const [isBookingLoading, setIsBookingLoading] = useState(false);
   const [serviceBookings, setServiceBookings] = useState<Booking[]>([]);
 
@@ -170,21 +174,28 @@ const Marketplace = () => {
             serviceId: selectedService.id,
             ceremonyId: selectedCeremonyId,
             bookedByUserId: user.id,
-            bookedByUserName: user.name, 
+            bookedByUserName: user.name,
             providerId: selectedService.providerId,
+            providerName: selectedService.providerName,
             date: bookingDate,
             startTime: bookingStartTime,
             endTime: bookingEndTime,
             serviceName: selectedService.name,
-            price: selectedService.price
+            quantity: bookingQuantity,
+            unitPrice: selectedService.price
         });
-        
+
         setIsBookingLoading(false);
         setSelectedService(null);
         setBookingDate('');
         setBookingStartTime('08:00');
         setBookingEndTime('12:00');
-        await showAlert("ជោគជ័យ", "សំណើកក់ត្រូវបានផ្ញើដោយជោគជ័យ!", "success");
+        setBookingQuantity(1);
+        await showAlert(
+            "ជោគជ័យ",
+            `សំណើកក់ត្រូវបានផ្ញើដោយជោគជ័យ! សរុប $${bookingTotal.toLocaleString('en-US')}។ អ្នកអាចមើលលម្អិត និងចរចាជាមួយអ្នកផ្តល់សេវាក្នុងទំព័រ "ការកក់"។`,
+            "success"
+        );
 
       } catch (error: any) {
           setIsBookingLoading(false);
@@ -221,16 +232,25 @@ const Marketplace = () => {
       [UserRole.BEAUTY_SALON]: 'សម្អាងការ',
       [UserRole.CHEF]: 'ចុងភៅ',
       [UserRole.HALL]: 'ទីតាំង',
-      [UserRole.MUSIC_BAND]: 'ក្រុមតន្ត្រី'
+      [UserRole.MUSIC_BAND]: 'ក្រុមតន្ត្រី',
+      // Organizers list their coordination service here too, so clients can
+      // actually find one instead of being told the platform has none.
+      [UserRole.ORGANIZER]: 'អ្នករៀបចំកម្មវិធី'
   };
 
   const currentServiceReviews = selectedServiceForReview 
       ? reviews.filter(r => r.serviceId === selectedServiceForReview.id) 
       : [];
 
-  const existingBookingsOnSelectedDate = bookingDate 
+  const existingBookingsOnSelectedDate = bookingDate
       ? serviceBookings.filter(b => b.date === bookingDate)
       : [];
+
+  const bookingTotal = resolveBookingTotals(
+      { quantity: bookingQuantity, unitPrice: selectedService?.price || 0 }
+  ).price;
+  const depositPercent = selectedService?.depositPercent ?? 50;
+  const depositAmount = Number((bookingTotal * depositPercent / 100).toFixed(2));
 
   return (
     <div className="space-y-8">
@@ -248,7 +268,7 @@ const Marketplace = () => {
                     />
                 </div>
                 <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar items-center">
-                    {['ALL', UserRole.BEAUTY_SALON, UserRole.CHEF, UserRole.HALL, UserRole.MUSIC_BAND].map(role => (
+                    {['ALL', UserRole.ORGANIZER, UserRole.BEAUTY_SALON, UserRole.CHEF, UserRole.HALL, UserRole.MUSIC_BAND].map(role => (
                         <button
                             key={role}
                             onClick={() => { setFilterRole(role); setCurrentPage(1); }}
@@ -376,7 +396,9 @@ const Marketplace = () => {
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end flex-shrink-0">
-                                        <span className="font-bold text-rose-600 text-lg">${service.price}</span>
+                                        <span className="font-bold text-rose-600 text-lg">
+                                            ${service.price}{service.unitLabel ? <span className="text-xs font-bold text-slate-400"> / {service.unitLabel}</span> : null}
+                                        </span>
                                         {service.priceNote && <span className="text-[10px] text-slate-400 font-medium line-clamp-1 text-right">{service.priceNote}</span>}
                                     </div>
                                 </div>
@@ -394,7 +416,20 @@ const Marketplace = () => {
                                         <Button variant="outline" onClick={() => handleViewSchedule(service)} className="text-sm py-1.5 px-3" title="មើលកាលវិភាគ">
                                             <Calendar size={16} />
                                         </Button>
-                                        <Button onClick={() => setSelectedService(service)} className="text-sm py-1.5 px-4 flex-1 whitespace-nowrap shadow-sm">កក់ឥឡូវ</Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => navigate(`/messages?with=${service.providerId}`)}
+                                            className="text-sm py-1.5 px-3"
+                                            title="ផ្ញើសារ / ចរចាតម្លៃ"
+                                        >
+                                            <MessagesSquare size={16} />
+                                        </Button>
+                                        <Button
+                                            onClick={() => { setSelectedService(service); setBookingQuantity(1); }}
+                                            className="text-sm py-1.5 px-4 flex-1 whitespace-nowrap shadow-sm"
+                                        >
+                                            កក់ឥឡូវ
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -456,17 +491,63 @@ const Marketplace = () => {
         {/* Booking Modal */}
         <Modal isOpen={!!selectedService} onClose={() => setSelectedService(null)} title={`កក់សេវាកម្ម ${selectedService?.name}`}>
             <div className="space-y-4">
-                <div className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-100">
-                    <div className="flex justify-between items-center mb-2">
+                <div className="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-100 space-y-3">
+                    <div className="flex justify-between items-center">
                          <span className="text-sm text-slate-500">អ្នកផ្តល់សេវា</span>
                          <span className="font-medium text-slate-800">{selectedService?.providerName}</span>
                     </div>
                     <div className="flex justify-between items-center">
                          <span className="text-sm text-slate-500">តម្លៃ</span>
                          <div className="flex flex-col items-end">
-                            <span className="font-bold text-rose-600">${selectedService?.price}</span>
+                            <span className="font-bold text-rose-600">
+                                ${selectedService?.price}{selectedService?.unitLabel ? ` / ${selectedService.unitLabel}` : ''}
+                            </span>
                             {selectedService?.priceNote && <span className="text-[10px] text-slate-400">{selectedService.priceNote}</span>}
                          </div>
+                    </div>
+
+                    {/* Quantity — a caterer at $200/table needs to know it's 30 tables. */}
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                        <div>
+                            <span className="text-sm text-slate-500 block">
+                                ចំនួន{selectedService?.unitLabel ? ` (${selectedService.unitLabel})` : ''}
+                            </span>
+                            <span className="text-[10px] text-slate-400">សូមបញ្ជាក់ចំនួនដែលអ្នកត្រូវការ</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setBookingQuantity(q => Math.max(1, q - 1))}
+                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                            >
+                                <Minus size={14} />
+                            </button>
+                            <input
+                                type="number"
+                                min={1}
+                                value={bookingQuantity}
+                                onChange={e => setBookingQuantity(Math.max(1, Math.round(Number(e.target.value) || 1)))}
+                                className="w-16 text-center px-2 py-1.5 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-rose-100 font-bold text-slate-800"
+                            />
+                            <button
+                                onClick={() => setBookingQuantity(q => q + 1)}
+                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                            >
+                                <Plus size={14} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                        <span className="text-sm font-bold text-slate-700">សរុប</span>
+                        <div className="text-right">
+                            <span className="font-bold text-lg text-rose-600">${bookingTotal.toLocaleString('en-US')}</span>
+                            {depositAmount > 0 && (
+                                <p className="text-[10px] text-slate-500">
+                                    ប្រាក់កក់ {depositPercent}%៖ ${depositAmount.toLocaleString('en-US')}
+                                    {selectedService?.paymentQrUrl ? ' (មាន QR ក្នុងទំព័រការកក់)' : ''}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
                 

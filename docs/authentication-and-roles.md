@@ -96,7 +96,9 @@ logs the user back out.
   - Logged-in user on `/login` or `/select-role` → redirected to `/`.
 
 > **Note:** role-specific pages (`/organizer`, `/owner`, `/vendor`, `/admin`) are
-> only guarded by "is *any* user logged in." Which portal a role *should* use is
+> guarded by `RoleRoute`, and `/vendor` accepts the four vendor roles **plus
+> `ORGANIZER`**, who sells a coordination service in the same marketplace. Which
+> portal a role *should* use is
 > enforced by navigation visibility, not by the route itself. The real
 > data-level protection is Supabase RLS (see `database-and-security.md`).
 
@@ -108,9 +110,15 @@ current role:
 | Role | Sees (besides Dashboard + Community) | Marketplace | Admin |
 |------|--------------------------------------|-------------|-------|
 | `GENERAL_USER` | My Events (`/owner`) | ✅ | — |
-| `ORGANIZER` | Manage Events (`/organizer`) | ✅ | — |
-| Vendors | Services (`/vendor`) + Bookings (`/bookings`) | ❌ hidden | — |
+| `ORGANIZER` | Manage Events (`/organizer`) + Services (`/vendor`) | ✅ | — |
+| Vendors | Services (`/vendor`) | ❌ hidden | — |
 | `ADMIN` | System Admin (`/admin`, desktop only) | ✅ | ✅ |
+
+**Bookings (`/bookings`) and Messages (`/messages`) are in the navigation for
+every role** — the client side of a booking used to be reachable only through the
+dashboard activity feed, which is why a booked user could not open, check,
+correct or discuss what they had booked. Messages carries an unread badge fed by
+`getUnreadMessageCount` and Supabase Realtime.
 
 The mobile bottom bar caps at five items.
 

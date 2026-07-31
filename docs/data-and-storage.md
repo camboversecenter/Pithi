@@ -39,12 +39,25 @@ return a `PaginatedResponse<T>` (`{ data, total, page, limit, totalPages }`).
 `createService`, `updateService`, `deleteService`
 
 **Bookings:** `getBookings`, `getBookingsByService`, `getBookingById`,
-`createBooking`, `updateBookingStatus`, `updateBookingSchedule`, `deleteBooking`,
-`getBookingComments`, `addBookingComment`, `getBookingLogs`
+`createBooking`, `updateBookingStatus`, `updateBookingSchedule`,
+`updateBookingQuantity`, `deleteBooking`, `getBookingComments`,
+`addBookingComment`, `getBookingLogs`, plus `resolveBookingTotals`
+(`unitPrice × quantity → price`)
 
 **Guests & invitations:** `getGuests`, `addGuest`, `deleteGuest`,
 `getMyInvitations`, `respondToInvitation`, `getInvitationTemplates`,
-`saveInvitationTemplate`, `deleteInvitationTemplate`
+`saveInvitationTemplate`, `deleteInvitationTemplate`, and the anonymous-guest
+pair `getPublicInvitation` / `submitPublicRsvp` (Postgres RPCs — see
+[invitations-and-rsvp.md](invitations-and-rsvp.md))
+
+**Messaging & announcements:** `chatService.ts` holds `getConversations`,
+`getConversation`, `getUnreadMessageCount`, `sendDirectMessage`,
+`markConversationRead`, `subscribeToMessages`; `dataService` holds
+`getAnnouncements`, `createAnnouncement`, `deleteAnnouncement`
+
+**Ceremony status helpers:** `getCeremonyStatus`, `isCeremonyExpired`
+
+**AI context:** `getAssistantSnapshot`
 
 **Finance:** `getTransactions`, `addTransaction`, `deleteTransaction`,
 `reportTransaction`, `getMyReportedTransactions`, `getPendingReportedTransactions`,
@@ -60,7 +73,12 @@ return a `PaginatedResponse<T>` (`{ data, total, page, limit, totalPages }`).
 
 ### Notable behaviors
 - **Booking logs** are written automatically: `createBooking` logs `CREATED`,
-  `updateBookingSchedule` logs `SCHEDULE_CHANGE`.
+  `updateBookingSchedule` logs `SCHEDULE_CHANGE`, `updateBookingQuantity` logs
+  `QUANTITY_CHANGE`.
+- **Writes another person must see** — bookings, booking comments, guest RSVPs,
+  announcements and direct messages — surface their error instead of falling back
+  to localStorage. A local-only copy looks like success to the sender while the
+  recipient never receives anything.
 - **Gift confirmation** (`confirmReportedTransaction`) converts KHR to USD at a
   fixed **÷ 4000** rate and inserts a matching INCOME transaction.
 - **Reactions/bookmarks** call the Postgres `increment_post_stat` /
@@ -73,7 +91,8 @@ return a `PaginatedResponse<T>` (`{ data, total, page, limit, totalPages }`).
 ## Image storage (`storageService.ts`)
 
 A single public Supabase Storage bucket named **`PITHI`**, with folders
-`services/`, `ceremonies/`, `receipts/`, `templates/`.
+`services/`, `ceremonies/`, `receipts/`, `templates/`, and `chat/` (the last one
+holds chat photos and voice notes).
 
 - **`uploadImage(file, folder)`** returns a public URL. In mock mode it returns a
   base64 data URL instead. It even attempts to **auto-create the bucket** if it's

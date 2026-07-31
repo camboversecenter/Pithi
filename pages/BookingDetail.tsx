@@ -1,11 +1,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBookingById, getCeremonyById, getServiceById, getBookingComments, getBookingLogs, addBookingComment, updateBookingSchedule, updateBookingStatus, deleteBooking, getReviews, addReview } from '../services/dataService';
+import { getBookingById, getCeremonyById, getServiceById, getBookingComments, getBookingLogs, addBookingComment, updateBookingSchedule, updateBookingStatus, updateBookingQuantity, deleteBooking, getReviews, addReview } from '../services/dataService';
+import { uploadImage } from '../services/storageService';
 import { getCurrentUser } from '../services/authService';
 import { Booking, Ceremony, Service, BookingComment, BookingLog, UserRole, BookingStatus, Review } from '../types';
 import { Badge, Card, Button, Input, Modal } from '../components/UIComponents';
-import { ArrowLeft, Calendar, Clock, MapPin, User, DollarSign, FileText, Send, History, Edit2, AlertCircle, Globe, ExternalLink, CheckCircle, XCircle, CheckSquare, Trash2, Star } from 'lucide-react';
+import { ChatComposer, ChatAttachmentView, ComposedMessage } from '../components/ChatComposer';
+import { ArrowLeft, Calendar, Clock, MapPin, User, DollarSign, FileText, History, Edit2, AlertCircle, Globe, ExternalLink, CheckCircle, XCircle, CheckSquare, Trash2, Star, QrCode, MessagesSquare, Layers } from 'lucide-react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const BookingDetail = () => {
@@ -21,12 +23,11 @@ const BookingDetail = () => {
     const [logs, setLogs] = useState<BookingLog[]>([]);
     
     const [loading, setLoading] = useState(true);
-    const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
-    
+
     // Edit Schedule State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editData, setEditData] = useState({ date: '', startTime: '', endTime: '' });
+    const [editData, setEditData] = useState({ date: '', startTime: '', endTime: '', quantity: 1 });
     const [updating, setUpdating] = useState(false);
     const [updateError, setUpdateError] = useState('');
 
@@ -68,21 +69,29 @@ const BookingDetail = () => {
             setEditData({
                 date: b.date,
                 startTime: b.startTime,
-                endTime: b.endTime
+                endTime: b.endTime,
+                quantity: b.quantity || 1
             });
         }
         setLoading(false);
     };
 
-    const handleSendMessage = async () => {
-        if (!newMessage.trim() || !currentUser || !booking) return;
+    const handleSendMessage = async ({ text, file, kind }: ComposedMessage) => {
+        if (!currentUser || !booking) return;
+        if (!text && !file) return;
         setSending(true);
-        await addBookingComment(booking.id, currentUser.id, currentUser.name, currentUser.role, newMessage);
-        setNewMessage('');
-        // Refresh comments
-        const freshComments = await getBookingComments(booking.id);
-        setComments(freshComments);
-        setSending(false);
+        try {
+            let attachment: { url: string; type: 'IMAGE' | 'AUDIO' } | undefined;
+            if (file && kind) {
+                attachment = { url: await uploadImage(file, 'chat'), type: kind };
+            }
+            await addBookingComment(booking.id, currentUser.id, currentUser.name, currentUser.role, text, attachment);
+            setComments(await getBookingComments(booking.id));
+        } catch (error: any) {
+            await showAlert('បរាជ័យ', error.message || 'មិនអាចផ្ញើសារបានទេ។', 'danger');
+        } finally {
+            setSending(false);
+        }
     };
 
     const handleUpdateSchedule = async () => {
@@ -90,14 +99,21 @@ const BookingDetail = () => {
         setUpdateError('');
         setUpdating(true);
         try {
-            const updatedBooking = await updateBookingSchedule(
-                booking.id, 
-                editData.date, 
-                editData.startTime, 
-                editData.endTime, 
-                currentUser.id, 
+            let updatedBooking = await updateBookingSchedule(
+                booking.id,
+                editData.date,
+                editData.startTime,
+                editData.endTime,
+                currentUser.id,
                 currentUser.name
             );
+
+            // Correcting the quantity (and therefore the total) is part of
+            // fixing a booking that was placed with the wrong number.
+            const nextQuantity = Math.max(1, Math.round(Number(editData.quantity) || 1));
+            if (nextQuantity !== (booking.quantity || 1)) {
+                updatedBooking = await updateBookingQuantity(booking.id, nextQuantity, currentUser.id, currentUser.name);
+            }
             setBooking(updatedBooking);
             
             // Refresh logs
@@ -193,6 +209,12 @@ const BookingDetail = () => {
     // Permissions & Rules
     const isProvider = currentUser?.id === booking.providerId;
     const isPastBooking = booking.date < new Date().toISOString().split('T')[0];
+    const unitPrice = Number(booking.unitPrice ?? (booking.quantity ? booking.price / booking.quantity : booking.price)) || 0;
+    const depositPercent = service?.depositPercent ?? 50;
+    const depositAmount = Number((Number(booking.price || 0) * depositPercent / 100).toFixed(2));
+    // Who the viewer talks to about this booking.
+    const counterpartId = isProvider ? booking.bookedByUserId : booking.providerId;
+    const counterpartName = isProvider ? (booking.bookedByUserName || 'អតិថិជន') : (booking.providerName || 'អ្នកផ្តល់សេវា');
     // The client may rate the service once the vendor marked the booking completed
     const canReview = currentUser?.id === booking.bookedByUserId && booking.status === BookingStatus.COMPLETED;
     
@@ -253,17 +275,19 @@ const BookingDetail = () => {
                     </div>
                 )}
 
-                {/* Booker Actions (e.g., Delete) */}
-                {!isProvider && !isPastBooking && (
+                {/* Booker Actions — a mis-clicked booking must be correctable and
+                    cancellable, not permanent. */}
+                {!isProvider && !isPastBooking && booking.status !== BookingStatus.CANCELLED && (
                     <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => setIsEditModalOpen(true)} variant="outline">
+                            <Edit2 className="w-4 h-4 mr-2"/> កែប្រែការកក់
+                        </Button>
+                        <Button onClick={() => handleStatusUpdate(BookingStatus.CANCELLED)} variant="secondary" className="text-red-600 hover:bg-red-50 hover:border-red-100">
+                            <XCircle className="w-4 h-4 mr-2"/> បោះបង់ការកក់
+                        </Button>
                         {booking.status === BookingStatus.PENDING && (
                             <Button onClick={handleDelete} variant="danger">
-                                <Trash2 className="w-4 h-4 mr-2"/> លុបការកក់
-                            </Button>
-                        )}
-                        {booking.status === BookingStatus.CONFIRMED && (
-                             <Button onClick={() => handleStatusUpdate(BookingStatus.CANCELLED)} variant="secondary" className="text-red-600 hover:bg-red-50 hover:border-red-100">
-                                <XCircle className="w-4 h-4 mr-2"/> បោះបង់
+                                <Trash2 className="w-4 h-4 mr-2"/> លុបចោល
                             </Button>
                         )}
                     </div>
@@ -321,11 +345,27 @@ const BookingDetail = () => {
                                 </div>
                             </div>
                             <div className="p-4 rounded-xl border border-slate-100 bg-white">
+                                <p className="text-slate-500 text-sm mb-1">ចំនួន</p>
+                                <div className="flex items-center font-medium text-slate-800">
+                                    <Layers className="w-4 h-4 mr-2 text-rose-500"/>
+                                    {booking.quantity || 1}{service?.unitLabel ? ` ${service.unitLabel}` : ''}
+                                    {unitPrice > 0 && (
+                                        <span className="text-xs text-slate-400 ml-2">× ${unitPrice}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="p-4 rounded-xl border border-slate-100 bg-white">
                                 <p className="text-slate-500 text-sm mb-1">តម្លៃសរុប</p>
                                 <div className="flex items-center font-bold text-xl text-rose-600">
                                     <DollarSign className="w-5 h-5 mr-1"/>
                                     {booking.price}
                                 </div>
+                                {depositAmount > 0 && (
+                                    <p className="text-[11px] text-slate-500 mt-1">
+                                        ប្រាក់កក់ {depositPercent}%៖ ${depositAmount}
+                                    </p>
+                                )}
                             </div>
                             
                             {/* Conditional Info Card: Customer for Provider, Provider for Customer */}
@@ -386,7 +426,8 @@ const BookingDetail = () => {
                                                                 {new Date(cmt.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                             </span>
                                                         </div>
-                                                        <p className="text-sm">{cmt.content}</p>
+                                                        {cmt.content && <p className="text-sm whitespace-pre-wrap break-words">{cmt.content}</p>}
+                                                        <ChatAttachmentView url={cmt.attachmentUrl} type={cmt.attachmentType} />
                                                     </div>
                                                 </div>
                                             )
@@ -395,24 +436,23 @@ const BookingDetail = () => {
                                 )}
                             </div>
                             
-                            {/* Chat Input */}
-                            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-50">
-                                <input 
-                                    className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-100 focus:border-rose-500 outline-none transition-all placeholder:text-slate-400 text-sm shadow-inner" 
-                                    placeholder={isPastBooking ? "ការពិភាក្សាត្រូវបានបិទសម្រាប់កម្មវិធីដែលបានបញ្ចប់" : "សរសេរសារ..."}
-                                    value={newMessage}
-                                    onChange={e => setNewMessage(e.target.value)}
-                                    disabled={isPastBooking || sending}
-                                    onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                            {/* Chat Input — text, photos and voice notes, so terms can
+                                actually be negotiated here. */}
+                            <div className="mt-4 pt-4 border-t border-slate-50">
+                                <ChatComposer
+                                    onSend={handleSendMessage}
+                                    sending={sending}
+                                    disabled={isPastBooking}
+                                    placeholder={isPastBooking ? 'ការពិភាក្សាត្រូវបានបិទសម្រាប់កម្មវិធីដែលបានបញ្ចប់' : 'សរសេរសារ ឬចរចាតម្លៃ...'}
                                 />
-                                <Button 
-                                    onClick={handleSendMessage} 
-                                    disabled={isPastBooking || !newMessage.trim() || sending} 
-                                    isLoading={sending}
-                                    className="px-4 py-2.5 rounded-xl shadow-none"
-                                >
-                                    <Send className="w-5 h-5" />
-                                </Button>
+                                {counterpartId && (
+                                    <button
+                                        onClick={() => navigate(`/messages?with=${counterpartId}`)}
+                                        className="mt-3 text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1.5"
+                                    >
+                                        <MessagesSquare size={14} /> ផ្ញើសារផ្ទាល់ទៅ {counterpartName}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </Card>
@@ -443,6 +483,30 @@ const BookingDetail = () => {
                             <div className="text-slate-500 text-sm italic">មិនមានព័ត៌មានកម្មវិធី</div>
                         )}
                     </Card>
+
+                    {/* Deposit payment — the vendor's QR, with the amount worked out. */}
+                    {!isProvider && service?.paymentQrUrl && booking.status !== BookingStatus.CANCELLED && (
+                        <Card title="បង់ប្រាក់កក់">
+                            <div className="space-y-3 text-center">
+                                <p className="text-sm text-slate-500 text-left">
+                                    ស្កេន QR ខាងក្រោមដើម្បីបង់ប្រាក់កក់ {depositPercent}% ជូន {booking.providerName || 'អ្នកផ្តល់សេវា'}។
+                                </p>
+                                <img
+                                    src={service.paymentQrUrl}
+                                    alt="Vendor payment QR"
+                                    className="w-48 h-48 mx-auto object-contain bg-white border border-slate-200 rounded-xl p-2"
+                                />
+                                <div className="bg-rose-50 border border-rose-100 rounded-xl py-3">
+                                    <p className="text-xs text-slate-500">ចំនួនត្រូវបង់</p>
+                                    <p className="text-2xl font-bold text-rose-600">${depositAmount}</p>
+                                    <p className="text-[11px] text-slate-500">ក្នុងតម្លៃសរុប ${booking.price}</p>
+                                </div>
+                                <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
+                                    <QrCode size={12} /> សូមផ្ញើវិក្កយបត្រទៅអ្នកផ្តល់សេវាក្នុងការពិភាក្សាខាងលើ។
+                                </p>
+                            </div>
+                        </Card>
+                    )}
 
                     {/* Review prompt for completed bookings */}
                     {canReview && (
@@ -516,14 +580,26 @@ const BookingDetail = () => {
                             />
                         </div>
                         <div className="flex-1">
-                             <Input 
-                                label="ម៉ោងបញ្ចប់" 
+                             <Input
+                                label="ម៉ោងបញ្ចប់"
                                 type="time"
                                 value={editData.endTime}
                                 onChange={e => setEditData({...editData, endTime: e.target.value})}
                             />
                         </div>
                     </div>
+                    <Input
+                        label={`ចំនួន${service?.unitLabel ? ` (${service.unitLabel})` : ''}`}
+                        type="number"
+                        min={1}
+                        value={editData.quantity}
+                        onChange={e => setEditData({ ...editData, quantity: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
+                    />
+                    {unitPrice > 0 && (
+                        <p className="-mt-3 text-xs text-slate-500">
+                            តម្លៃថ្មីនឹងក្លាយជា <span className="font-bold text-rose-600">${(unitPrice * Math.max(1, editData.quantity)).toFixed(2)}</span> (${unitPrice} × {Math.max(1, editData.quantity)})
+                        </p>
+                    )}
                     <Button className="w-full" onClick={handleUpdateSchedule} isLoading={updating}>រក្សាទុកការកែប្រែ</Button>
                     <p className="text-xs text-slate-400 text-center mt-2">ការកែប្រែនេះនឹងត្រូវបានកត់ត្រាក្នុងប្រវត្តិ។</p>
                 </div>

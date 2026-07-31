@@ -13,19 +13,29 @@ nearly identical to the [Owner Portal](owner-portal.md); the two differences are
 ## Three views
 
 The page is a single-component state machine:
-1. **List** (default) — a paginated grid of the organizer's ceremony cards
-   (9/page), each with view / edit / delete. Empty state:
-   `អ្នកមិនទាន់មានកម្មវិធីទេ។ សូមបង្កើតថ្មី។`
+1. **List** (default) — **ខាងមុខ / កន្លងផុត / ទាំងអស់** tabs over a paginated
+   grid of ceremony cards (9/page), each with view / edit / delete. The tab
+   drives the `UPCOMING | PAST | ALL` filter in `getCeremonies`, every card wears
+   a `CeremonyStatusBadge` (today / upcoming / past) and past banners are greyed
+   out, so a finished event is never mistaken for one still being planned.
 2. **Form** — full-page create/edit (`OrganizerCeremonyForm`).
 3. **Detail** — hero banner + four tabs, addressed by `?ceremonyId=`.
 
 ## Create / edit a ceremony (`OrganizerCeremonyForm`)
 
-Fields: **name** (required), **date** (required), **planned budget**, **location**,
-**event type** (Wedding `អាពាហ៍ពិពាហ៍`, Birthday `ខួបកំណើត`, Housewarming
-`ឡើងផ្ទះ`, Funeral `បុណ្យសព`, 7-day memorial `បុណ្យ ៧ ថ្ងៃ`, or a free-text
-Other), a **banner** image, a **KHQR** bank-QR image (shown to guests so they can
-send cash gifts), and a **welcome message**.
+Fields: **name** (required), **date** (required), **planned budget**,
+**location + Google Maps link** (`LocationMapField` — generate the link from the
+address, then open it to check the pin before any guest sees it), **event type**,
+a **banner** image, a **KHQR** bank-QR image (shown to guests so they can send
+cash gifts), and a **welcome message**.
+
+The type picker (`CeremonyTypePicker`) offers Wedding `អាពាហ៍ពិពាហ៍`, Birthday
+`ខួបកំណើត`, Housewarming `ឡើងផ្ទះ`, Funeral `បុណ្យសព`, 7-day memorial
+`បុណ្យ ៧ ថ្ងៃ`, and **ផ្សេងៗ (Other)**, which reveals a free-text field. Whether
+that field is showing is tracked as explicit state rather than inferred from the
+value, and the portal refuses to save an empty type — previously "Other" fell
+through an `|| 'អាពាហ៍ពិពាហ៍'` default and every custom event was stored, and
+displayed, as a wedding.
 
 Two AI helpers: **generate banner** (`generateCeremonyBanner`) and **AI-write the
 welcome message** (`generateInvitationMessage`).
@@ -40,9 +50,10 @@ uploads any new banner/KHQR (deleting old ones first) and calls
 
 | Tab | Khmer | Component | What it does |
 |-----|-------|-----------|--------------|
-| Overview | ទូទៅ | `OrganizerOverview` | Read-only summary: type, description, welcome message, budget, guest count |
+| Overview | ទូទៅ | `OrganizerOverview` | Summary: type + status badge, venue with a Maps link, description, welcome message, budget, guest count, and a **message the event owner** card |
 | Guests | ភ្ញៀវ (N) | `OrganizerGuests` | Full guest-list management (below) |
 | Invitations | លិខិតអញ្ជើញ | `OrganizerInvitations` | Invitation templates + shareable links (below) |
+| Announcements | ជូនដំណឹង | `AnnouncementsPanel` | Broadcast to this ceremony's guests — see [messaging-and-announcements.md](messaging-and-announcements.md) |
 | Plan | ផែនការ | `OrganizerPlan` | AI-generated ceremony plan |
 
 ### Guests tab

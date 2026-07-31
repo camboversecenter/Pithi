@@ -48,6 +48,21 @@ const saveLocalNotifications = (notifications: AppNotification[]) => {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(notifications));
 };
 
+// Writes a notification into the local demo inbox. Live databases create
+// notifications through SECURITY DEFINER triggers instead — a client is never
+// allowed to insert a row for somebody else.
+export const pushLocalNotification = (notification: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>) => {
+    if (!isLocalMode()) return;
+    const all = getLocalNotifications(notification.userId);
+    all.unshift({
+        ...notification,
+        id: 'local-' + Math.random().toString(36).slice(2, 11),
+        isRead: false,
+        createdAt: new Date().toISOString()
+    });
+    saveLocalNotifications(all);
+};
+
 // --- QUERIES ---
 
 export const getNotifications = async (userId: string, page: number, limit: number): Promise<PaginatedResponse<AppNotification>> => {

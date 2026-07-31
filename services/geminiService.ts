@@ -1,8 +1,14 @@
 
 import { supabase } from './supabaseConfig';
 import { getCurrentUser } from './authService';
-import { createCeremony, getServices, getCeremonies, createBooking } from './dataService';
+import { createCeremony, getServices, getCeremonies, createBooking, AssistantSnapshot } from './dataService';
 import { UserRole } from '../types';
+
+// Model IDs must be ones the Gemini API actually serves — a made-up name makes
+// every proxy call fail, which silently demotes the whole assistant to its
+// canned offline answers.
+const TEXT_MODEL = 'gemini-2.5-flash';
+const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 // Local AI Simulation fallback when Edge Function is offline or user is in a mock/sandbox session
 const getLocalAISimulatedResponse = (action: string, payload: any): any => {
@@ -59,56 +65,10 @@ const getLocalAISimulatedResponse = (action: string, payload: any): any => {
             return { text: "សូមគោរពអញ្ជើញចូលរួមជាភ្ញៀវកិត្តិយសក្នុងកម្មវិធីរបស់យើងខ្ញុំដោយមេត្រីភាព។" };
         }
 
-        // 6. Chat with AI (History)
+        // 6. Chat with AI (History) — handled by the offline assistant, which
+        // answers from the caller's own event data instead of canned text.
         if (Array.isArray(payload.contents)) {
-            const lastMsgObject = payload.contents[payload.contents.length - 1];
-            const lastParts = lastMsgObject?.parts || [];
-            const userText = lastParts.map((p: any) => p.text).join(' ').toLowerCase();
-
-            // Check if user is asking to create a wedding or ceremony
-            if (userText.includes('create') || userText.includes(' wedding') || userText.includes('មង្គលការ') || userText.includes('បង្កើត') || userText.includes('កម្មវិធី')) {
-                return {
-                    text: "ខ្ញុំកំពុងរៀបចំបង្កើតកម្មវិធីជូនលោកអ្នក...",
-                    functionCalls: [
-                        {
-                            name: "createCeremony",
-                            args: {
-                                title: "ពិធីមង្គលការ Sokha & Sophy",
-                                type: "អាពាហ៍ពិពាហ៍",
-                                date: "2026-12-18",
-                                location: "សណ្ឋាគារសូហ្វីតែល ភ្នំពេញ",
-                                description: "កម្មវិធីមង្គលការដែលបង្កើតឡើងដោយជំនួយការ AI របស់ PITHI"
-                            }
-                        }
-                    ]
-                };
-            }
-
-            // Check if user is asking to book a service
-            if (userText.includes('book') || userText.includes('កក់') || userText.includes('សេវាកម្ម') || userText.includes('chef') || userText.includes('band')) {
-                return {
-                    text: "កំពុងដំណើរការកក់សេវាកម្មជូនលោកអ្នក...",
-                    functionCalls: [
-                        {
-                            name: "bookService",
-                            args: {
-                                serviceName: "ចុងភៅខ្មែរអាជីព",
-                                ceremonyTitle: "ពិធីមង្គលការ Sokha & Sophy",
-                                date: "2026-12-18",
-                                startTime: "07:00",
-                                endTime: "21:00"
-                            }
-                        }
-                    ]
-                };
-            }
-
-            // Standard chatbot responses in Khmer
-            if (userText.includes('សួស្តី') || userText.includes('hello') || userText.includes('hi')) {
-                return { text: "សួស្តី! ខ្ញុំជាជំនួយការ AI របស់ PITHI។ ខ្ញុំអាចជួយលោកអ្នករៀបចំគម្រោងកម្មវិធីមង្គលការ បង្កើតកម្មវិធី កក់សេវាកម្មចុងភៅ ក្រុមតន្ត្រី ឬសាលពិធី និងឆ្លើយសំណួរផ្សេងៗ។ តើលោកអ្នកចង់ឱ្យខ្ញុំជួយអ្វីខ្លះនៅថ្ងៃនេះ?" };
-            }
-
-            return { text: "ខ្ញុំរីករាយណាស់ក្នុងការជួយអ្នករៀបចំពិធីមង្គលការ និងកម្មវិធីផ្សេងៗ! តើលោកអ្នកចង់ឱ្យខ្ញុំរៀបចំគម្រោងថវិកា ដ្យាក្រាមតុភ្ញៀវ ឬចំណាយផ្សេងៗជម្រើសណាខ្លះ?" };
+            return buildOfflineAssistantResponse(lastUserTextOf(payload.contents), null);
         }
     }
 
@@ -120,11 +80,15 @@ const getLocalAISimulatedResponse = (action: string, payload: any): any => {
     return { text: "" };
 };
 
-// Helper to call Edge Function
-const callGeminiFunction = async (action: string, payload: any) => {
+// Helper to call Edge Function. `localFallback` lets a caller supply a smarter
+// offline answer than the generic simulation (the chat assistant uses it to
+// keep replying from real event data when the proxy is unreachable).
+const callGeminiFunction = async (action: string, payload: any, localFallback?: () => any) => {
+    const runFallback = () => (localFallback ? localFallback() : getLocalAISimulatedResponse(action, payload));
+
     // If we're fully operating in sandboxed local simulator mode, immediately bypass network to be lightning fast
     if (localStorage.getItem('pithi_mock_user')) {
-        return getLocalAISimulatedResponse(action, payload);
+        return runFallback();
     }
 
     try {
@@ -137,7 +101,7 @@ const callGeminiFunction = async (action: string, payload: any) => {
         return data;
     } catch (invokeError: any) {
         console.warn(`[Pithi AI Local Sandbox Simulation] Fallback active for action [${action}]: `, invokeError.message || invokeError);
-        return getLocalAISimulatedResponse(action, payload);
+        return runFallback();
     }
 };
 
@@ -415,7 +379,7 @@ export const generateCeremonyPlan = async (ceremonyType: string): Promise<string
     `;
     
     const result = await callGeminiFunction('generateContent', {
-        model: 'gemini-3.5-flash',
+        model: TEXT_MODEL,
         contents: prompt
     });
 
@@ -485,7 +449,7 @@ export const generateInvitationMessage = async (ceremonyType: string, hostName: 
         `;
         
         const result = await callGeminiFunction('generateContent', {
-            model: 'gemini-3.5-flash',
+            model: TEXT_MODEL,
             contents: prompt
         });
 
@@ -516,7 +480,7 @@ export const generateCeremonyBanner = async (ceremonyType: string): Promise<stri
         
         // Try calling the remote proxy Edge function first
         const result = await callGeminiFunction('generateImages', {
-            model: 'gemini-2.5-flash-image',
+            model: IMAGE_MODEL,
             contents: { parts: [{ text: prompt }] },
             config: { imageConfig: { aspectRatio: "16:9" } }
         });
@@ -549,7 +513,7 @@ export const moderateSocialPost = async (title: string, content: string): Promis
         `;
 
         const result = await callGeminiFunction('generateContent', {
-            model: 'gemini-3-flash-preview',
+            model: TEXT_MODEL,
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -576,7 +540,7 @@ export const generateServicePhoto = async (serviceName: string, role: string): P
         const prompt = `A professional, high-quality, clear promotional photo for a ${role} service in Cambodia named '${serviceName}'. Elegant setting, natural lighting, professional presentation, appealing to customers. High resolution, 4k. No text.`;
         
         const result = await callGeminiFunction('generateImages', {
-            model: 'gemini-2.5-flash-image',
+            model: IMAGE_MODEL,
             contents: { parts: [{ text: prompt }] },
             config: { imageConfig: { aspectRatio: "4:3" } }
         });
@@ -595,7 +559,7 @@ export const generateServicePhoto = async (serviceName: string, role: string): P
 export const generateServiceDescription = async (serviceName: string, role: string): Promise<string> => {
     try {
         const result = await callGeminiFunction('generateContent', {
-            model: 'gemini-3.5-flash',
+            model: TEXT_MODEL,
             contents: `Write a short, professional marketing description (2 sentences) in Khmer for a ${role} service named "${serviceName}".`,
         });
         return result.text || `សេវាកម្ម ${role} ដ៏មានគុណភាពខ្ពស់ និងទំនុកចិត្តបំផុតសម្រាប់លោកអ្នក។`;
@@ -618,7 +582,7 @@ export const scanBankReceipt = async (base64Image: string): Promise<{ amount?: n
     try {
         const base64Data = base64Image.split(',')[1] || base64Image;
         const result = await callGeminiFunction('generateContent', {
-            model: 'gemini-2.5-flash',
+            model: TEXT_MODEL,
             contents: {
                 parts: [
                     { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
@@ -650,7 +614,7 @@ export const scanBusinessCard = async (base64Image: string): Promise<{ name?: st
     try {
         const base64Data = base64Image.split(',')[1] || base64Image;
         const result = await callGeminiFunction('generateContent', {
-            model: 'gemini-2.5-flash',
+            model: TEXT_MODEL,
             contents: {
                 parts: [
                     { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
@@ -677,6 +641,19 @@ export const scanBusinessCard = async (base64Image: string): Promise<{ name?: st
 
 // --- Chat & Tools ---
 
+export interface ChatAttachment {
+    /** Raw base64 payload (no data-url prefix). */
+    data: string;
+    mimeType: string;
+    kind: 'IMAGE' | 'AUDIO';
+}
+
+export interface ChatTurn {
+    role: 'user' | 'model';
+    text: string;
+    attachment?: ChatAttachment;
+}
+
 const createCeremonyTool = {
     name: "createCeremony",
     description: "Create a new ceremony or event in the system. Use this when the user explicitly asks to create, schedule, or add a new event/ceremony with specific details like title, date, and type.",
@@ -684,7 +661,7 @@ const createCeremonyTool = {
         type: "OBJECT",
         properties: {
             title: { type: "STRING", description: "The title of the ceremony" },
-            type: { type: "STRING", description: "The type of ceremony" },
+            type: { type: "STRING", description: "The type of ceremony in Khmer, e.g. អាពាហ៍ពិពាហ៍, ខួបកំណើត, ឡើងផ្ទះ, បុណ្យសព" },
             date: { type: "STRING", description: "The date of the event in YYYY-MM-DD format" },
             location: { type: "STRING", description: "The location of the event" },
             description: { type: "STRING", description: "A short description of the event" }
@@ -703,76 +680,345 @@ const bookServiceTool = {
             ceremonyTitle: { type: "STRING", description: "The title of the ceremony to book for" },
             date: { type: "STRING", description: "Date of booking YYYY-MM-DD" },
             startTime: { type: "STRING", description: "Start time HH:mm" },
-            endTime: { type: "STRING", description: "End time HH:mm" }
+            endTime: { type: "STRING", description: "End time HH:mm" },
+            quantity: { type: "NUMBER", description: "How many units to book (e.g. number of tables). Defaults to 1." }
         },
         required: ["serviceName", "ceremonyTitle", "date", "startTime", "endTime"]
     }
 };
 
-export const chatWithAI = async (context: string, history: { role: string, parts: { text: string }[] }[]): Promise<string> => {
-    try {
-        const systemInstruction = `You are a smart and helpful AI assistant for PITHI (Cambodian Ceremony Management Platform). Respond in Khmer. Context: ${context}`;
-        
-        // We pass the tool definitions to the edge function
-        const result = await callGeminiFunction('generateContent', {
-            model: 'gemini-3-flash-preview',
-            contents: history,
-            config: { 
-                systemInstruction,
-                tools: [{ functionDeclarations: [createCeremonyTool, bookServiceTool] }]
-            }
-        });
+// --- Offline assistant -------------------------------------------------
+// When the Gemini proxy is unreachable the assistant still has to be useful,
+// so it answers from the caller's own snapshot (their events, bookings and the
+// marketplace) rather than repeating a generic greeting.
 
-        const functionCalls = result.functionCalls;
-        
-        // Client-side tool execution logic
-        if (functionCalls && functionCalls.length > 0) {
-            const call = functionCalls[0];
-            const user = getCurrentUser();
-            if (!user) return "សូមអភ័យទោស អ្នកត្រូវចូលគណនីជាមុនសិន។";
+const KHMER_TYPE_KEYWORDS: { keywords: string[]; type: string }[] = [
+    { keywords: ['អាពាហ៍ពិពាហ៍', 'មង្គលការ', 'wedding', 'marriage'], type: 'អាពាហ៍ពិពាហ៍' },
+    { keywords: ['ខួបកំណើត', 'birthday'], type: 'ខួបកំណើត' },
+    { keywords: ['ឡើងផ្ទះ', 'housewarming'], type: 'ឡើងផ្ទះ' },
+    { keywords: ['បុណ្យ ៧ ថ្ងៃ', '៧ ថ្ងៃ', 'seven day'], type: 'បុណ្យ ៧ ថ្ងៃ' },
+    { keywords: ['បុណ្យសព', 'funeral'], type: 'បុណ្យសព' }
+];
 
-            if (call.name === 'createCeremony') {
-                const args = call.args;
-                await createCeremony({ 
-                    title: args.title, 
-                    type: args.type, 
-                    date: args.date, 
-                    description: args.description || `បង្កើតដោយ AI Assistant`, 
-                    organizerId: user.id, 
-                    ownerId: user.id 
-                });
-                return `✅ ខ្ញុំបានបង្កើតកម្មវិធី "${args.title}" រួចរាល់ហើយ!`;
-            }
+export const lastUserTextOf = (contents: any): string => {
+    if (!Array.isArray(contents)) return '';
+    for (let i = contents.length - 1; i >= 0; i--) {
+        const turn = contents[i];
+        if (turn?.role && turn.role !== 'user') continue;
+        return (turn?.parts || [])
+            .map((p: any) => p?.text || '')
+            .join(' ')
+            .trim();
+    }
+    return '';
+};
 
-            if (call.name === 'bookService') {
-                const args = call.args;
-                const roleToFetch = user.role === UserRole.ORGANIZER ? UserRole.ORGANIZER : UserRole.GENERAL_USER;
-                const myCeremonies = await getCeremonies(user.id, roleToFetch, 1, 1000, 'ALL');
-                const targetCeremony = myCeremonies.data.find(c => c.title.toLowerCase().includes(args.ceremonyTitle.toLowerCase()));
-                if (!targetCeremony) return `❌ ខ្ញុំរកមិនឃើញកម្មវិធីឈ្មោះ "${args.ceremonyTitle}" ទេ។`;
-                
-                const allServices = await getServices(undefined, 1, 1000);
-                const targetService = allServices.data.find(s => s.name.toLowerCase().includes(args.serviceName.toLowerCase()));
-                if (!targetService) return `❌ ខ្ញុំរកមិនឃើញសេវាកម្មឈ្មោះ "${args.serviceName}" ទេ។`;
-                
-                await createBooking({ 
-                    serviceId: targetService.id, 
-                    ceremonyId: targetCeremony.id, 
-                    bookedByUserId: user.id, 
-                    bookedByUserName: user.name, 
-                    providerId: targetService.providerId, 
-                    date: args.date, 
-                    startTime: args.startTime, 
-                    endTime: args.endTime, 
-                    serviceName: targetService.name, 
-                    price: targetService.price 
-                });
-                return `✅ ជោគជ័យ! បានកក់ "${targetService.name}"។`;
-            }
+const detectCeremonyType = (text: string): string | null => {
+    const lower = text.toLowerCase();
+    for (const entry of KHMER_TYPE_KEYWORDS) {
+        if (entry.keywords.some(k => lower.includes(k.toLowerCase()))) return entry.type;
+    }
+    return null;
+};
+
+// Understands 2026-12-18, 18/12/2026 and 18-12-2026.
+const detectDate = (text: string): string | null => {
+    const iso = text.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (iso) {
+        const [, y, m, d] = iso;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    const dmy = text.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmy) {
+        const [, d, m, y] = dmy;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return null;
+};
+
+const detectQuotedTitle = (text: string): string | null => {
+    const quoted = text.match(/[«"“']([^»"”']{3,80})[»"”']/);
+    return quoted ? quoted[1].trim() : null;
+};
+
+const wantsToCreateEvent = (text: string) => {
+    const lower = text.toLowerCase();
+    return ['បង្កើត', 'រៀបចំកម្មវិធី', 'create', 'add event', 'new event', 'schedule']
+        .some(k => lower.includes(k));
+};
+
+const wantsToBook = (text: string) => {
+    const lower = text.toLowerCase();
+    return ['កក់', 'book ', 'booking', 'reserve'].some(k => lower.includes(k));
+};
+
+const formatMoney = (amount: number) => `$${Number(amount || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+
+// Builds the assistant's reply (and any tool call) without the network.
+export const buildOfflineAssistantResponse = (userText: string, snapshot: AssistantSnapshot | null): any => {
+    const text = (userText || '').trim();
+    const lower = text.toLowerCase();
+
+    // 1. Event creation intent — pull the real details out of the sentence
+    //    instead of inventing a placeholder wedding.
+    if (wantsToCreateEvent(text)) {
+        const type = detectCeremonyType(text) || 'ផ្សេងៗ';
+        const date = detectDate(text);
+        if (!date) {
+            return {
+                text: `ខ្ញុំអាចបង្កើតកម្មវិធី « ${type} » ជូនបាន។ សូមប្រាប់កាលបរិច្ឆេទ (ឧ. 2026-12-18) ហើយខ្ញុំនឹងបង្កើតវាភ្លាមៗ។`
+            };
         }
-        return result.text || "ខ្ញុំមិនអាចឆ្លើយតបបានទេនៅពេលនេះ។";
+        const title = detectQuotedTitle(text) || `${type} ${date}`;
+        return {
+            text: `កំពុងបង្កើតកម្មវិធី « ${title} »...`,
+            functionCalls: [{
+                name: 'createCeremony',
+                args: {
+                    title,
+                    type,
+                    date,
+                    description: 'បង្កើតដោយជំនួយការ AI របស់ PITHI'
+                }
+            }]
+        };
+    }
+
+    if (!snapshot) {
+        if (wantsToBook(text)) {
+            return { text: 'សូមប្រាប់ខ្ញុំពីឈ្មោះសេវាកម្ម ឈ្មោះកម្មវិធី កាលបរិច្ឆេទ និងម៉ោង ដើម្បីឱ្យខ្ញុំកក់ជូន។' };
+        }
+        return { text: 'សួស្តី! ខ្ញុំជាជំនួយការ PITHI។ ខ្ញុំអាចបង្កើតកម្មវិធី កក់សេវាកម្ម និងឆ្លើយសំណួរអំពីកម្មវិធីរបស់អ្នក។' };
+    }
+
+    const upcoming = snapshot.ceremonies.filter(c => c.status !== 'PAST');
+    const past = snapshot.ceremonies.filter(c => c.status === 'PAST');
+    const activeBookings = snapshot.bookings.filter(b => b.status !== 'CANCELLED');
+
+    // 2. Booking intent — match against the user's real events and the catalogue.
+    if (wantsToBook(text)) {
+        const service = snapshot.services.find(s => lower.includes(s.name.toLowerCase()))
+            || snapshot.services.find(s => lower.includes(s.providerName.toLowerCase()));
+        const ceremony = snapshot.ceremonies.find(c => lower.includes(c.title.toLowerCase())) || upcoming[0];
+        const date = detectDate(text) || ceremony?.date;
+
+        if (service && ceremony && date) {
+            return {
+                text: `កំពុងស្នើកក់ « ${service.name} » សម្រាប់ « ${ceremony.title} »...`,
+                functionCalls: [{
+                    name: 'bookService',
+                    args: {
+                        serviceName: service.name,
+                        ceremonyTitle: ceremony.title,
+                        date,
+                        startTime: '08:00',
+                        endTime: '17:00'
+                    }
+                }]
+            };
+        }
+
+        const options = snapshot.services.slice(0, 5)
+            .map(s => `• ${s.name} — ${s.providerName} (${formatMoney(s.price)}${s.unitLabel ? `/${s.unitLabel}` : ''})`)
+            .join('\n');
+        return {
+            text: `ដើម្បីកក់សេវាកម្ម ខ្ញុំត្រូវដឹងឈ្មោះសេវាកម្ម និងកម្មវិធីគោលដៅ។\n\n${options ? `សេវាកម្មដែលមាន៖\n${options}` : 'មិនទាន់មានសេវាកម្មក្នុងទីផ្សារទេ។'}\n\n${upcoming.length ? `កម្មវិធីរបស់អ្នក៖ ${upcoming.map(c => c.title).join(', ')}` : 'អ្នកមិនទាន់មានកម្មវិធីខាងមុខទេ។'}`
+        };
+    }
+
+    // 3. Questions about the user's own data.
+    if (['កម្មវិធី', 'event', 'ceremony', 'ពិធី'].some(k => lower.includes(k))) {
+        if (upcoming.length === 0 && past.length === 0) {
+            return { text: `${snapshot.user.name} មិនទាន់មានកម្មវិធីណាមួយទេ។ សូមប្រាប់ខ្ញុំ (ឧ. "បង្កើតមង្គលការ 2026-12-18") ហើយខ្ញុំនឹងបង្កើតជូន។` };
+        }
+        const list = upcoming.map(c =>
+            `• ${c.title} (${c.type}) — ${c.date}${c.location ? ` នៅ ${c.location}` : ''}`
+        ).join('\n');
+        return {
+            text: `កម្មវិធីខាងមុខរបស់អ្នក (${upcoming.length})៖\n${list || 'គ្មានទេ'}` +
+                (past.length ? `\n\nកម្មវិធីកន្លងផុត៖ ${past.length}` : '')
+        };
+    }
+
+    if (['កក់', 'booking', 'សេវាកម្ម', 'service'].some(k => lower.includes(k))) {
+        if (activeBookings.length === 0) {
+            return { text: 'អ្នកមិនទាន់មានការកក់សេវាកម្មណាមួយទេ។ សូមចូលទៅកាន់ទីផ្សារ ដើម្បីជ្រើសរើសចុងភៅ សាល ឬក្រុមតន្ត្រី។' };
+        }
+        const list = activeBookings.slice(0, 6).map(b =>
+            `• ${b.serviceName} — ${b.date} ${b.startTime}-${b.endTime} (${b.status}) ${formatMoney(b.price)}${b.quantity && b.quantity > 1 ? ` សម្រាប់ ${b.quantity} ឯកតា` : ''}`
+        ).join('\n');
+        const total = activeBookings.reduce((sum, b) => sum + Number(b.price || 0), 0);
+        return { text: `ការកក់របស់អ្នក (${activeBookings.length})៖\n${list}\n\nសរុប៖ ${formatMoney(total)}` };
+    }
+
+    if (['ថវិកា', 'budget', 'ចំណាយ', 'តម្លៃ'].some(k => lower.includes(k))) {
+        const planned = snapshot.ceremonies.reduce((sum, c) => sum + Number(c.budget || 0), 0);
+        const committed = activeBookings.reduce((sum, b) => sum + Number(b.price || 0), 0);
+        return {
+            text: `ថវិកាគ្រោងសរុប៖ ${formatMoney(planned)}\nបានកក់សេវាកម្មរួច៖ ${formatMoney(committed)}\nនៅសល់៖ ${formatMoney(planned - committed)}`
+        };
+    }
+
+    // 4. Default — a real status summary, not a canned greeting.
+    const next = upcoming[0];
+    return {
+        text: `សួស្តី ${snapshot.user.name}! នេះជាសង្ខេបរបស់អ្នកនៅថ្ងៃទី ${snapshot.today}៖\n` +
+            `• កម្មវិធីខាងមុខ៖ ${upcoming.length}${next ? ` (បន្ទាប់៖ ${next.title} ថ្ងៃទី ${next.date})` : ''}\n` +
+            `• ការកក់សេវាកម្ម៖ ${activeBookings.length}\n\n` +
+            `ខ្ញុំអាចបង្កើតកម្មវិធីថ្មី កក់សេវាកម្ម ឬពន្យល់អំពីថវិការបស់អ្នក។ សូមសួរមកបាន។`
+    };
+};
+
+// Turns the snapshot into a compact briefing the model can reason over.
+const buildSystemInstruction = (snapshot: AssistantSnapshot): string => {
+    const ceremonies = snapshot.ceremonies.length
+        ? snapshot.ceremonies.map(c =>
+            `- "${c.title}" | type=${c.type} | date=${c.date} | status=${c.status} | location=${c.location || 'n/a'} | budget=${c.budget ?? 'n/a'}`
+        ).join('\n')
+        : '- (none yet)';
+
+    const bookings = snapshot.bookings.length
+        ? snapshot.bookings.map(b =>
+            `- "${b.serviceName}" for "${b.ceremonyTitle || 'n/a'}" | ${b.date} ${b.startTime}-${b.endTime} | ${b.status} | total=$${b.price}${b.quantity && b.quantity > 1 ? ` | qty=${b.quantity}` : ''}`
+        ).join('\n')
+        : '- (none yet)';
+
+    const services = snapshot.services.length
+        ? snapshot.services.map(s =>
+            `- "${s.name}" by ${s.providerName} | ${s.role} | $${s.price}${s.unitLabel ? ` per ${s.unitLabel}` : ''} | ${s.location}`
+        ).join('\n')
+        : '- (none listed)';
+
+    return [
+        'You are PITHI\'s assistant for Cambodian ceremony planning. Always reply in Khmer,',
+        'warmly and concisely. Ground every answer in the data below — quote real titles,',
+        'dates and prices instead of speaking generally, and say plainly when something is',
+        'not in the data. Use a solemn, respectful tone for funerals (បុណ្យសព) and memorials.',
+        'When the user asks you to create an event or make a booking, call the matching tool',
+        'with the details they gave; ask for the missing field only when you truly need it.',
+        '',
+        `TODAY: ${snapshot.today}`,
+        `USER: ${snapshot.user.name} (role ${snapshot.user.role})`,
+        '',
+        'THEIR CEREMONIES:',
+        ceremonies,
+        '',
+        'THEIR BOOKINGS:',
+        bookings,
+        '',
+        'MARKETPLACE SERVICES:',
+        services
+    ].join('\n');
+};
+
+const toGeminiContents = (history: ChatTurn[]) => history.map(turn => {
+    const parts: any[] = [];
+    if (turn.attachment) {
+        parts.push({ inlineData: { mimeType: turn.attachment.mimeType, data: turn.attachment.data } });
+    }
+    if (turn.text) parts.push({ text: turn.text });
+    if (parts.length === 0) parts.push({ text: '' });
+    return { role: turn.role, parts };
+});
+
+// Executes a tool the model asked for. Returns the message shown to the user.
+const runAssistantTool = async (call: { name: string; args: any }): Promise<string> => {
+    const user = getCurrentUser();
+    if (!user) return "សូមអភ័យទោស អ្នកត្រូវចូលគណនីជាមុនសិន។";
+
+    if (call.name === 'createCeremony') {
+        const args = call.args || {};
+        if (!args.title || !args.date) {
+            return '❌ ខ្ញុំត្រូវការឈ្មោះកម្មវិធី និងកាលបរិច្ឆេទ ដើម្បីបង្កើតកម្មវិធី។';
+        }
+        const created = await createCeremony({
+            title: args.title,
+            // An unrecognised type stays as the user described it — it must not
+            // silently become a wedding.
+            type: (args.type || '').trim() || 'ផ្សេងៗ',
+            date: args.date,
+            location: args.location || '',
+            description: args.description || 'បង្កើតដោយជំនួយការ AI របស់ PITHI',
+            organizerId: user.id,
+            ownerId: user.id
+        });
+        return `✅ បានបង្កើតកម្មវិធី « ${created.title} » (${created.type}) នៅថ្ងៃទី ${created.date} រួចរាល់!\n` +
+            `សូមបើក "កម្មវិធីរបស់ខ្ញុំ" ដើម្បីបន្ថែមភ្ញៀវ ថវិកា និងលិខិតអញ្ជើញ។`;
+    }
+
+    if (call.name === 'bookService') {
+        const args = call.args || {};
+        const roleToFetch = user.role === UserRole.ORGANIZER ? UserRole.ORGANIZER : UserRole.GENERAL_USER;
+        const myCeremonies = await getCeremonies(user.id, roleToFetch, 1, 1000, 'ALL');
+        const targetCeremony = myCeremonies.data.find(c => c.title.toLowerCase().includes(String(args.ceremonyTitle || '').toLowerCase()));
+        if (!targetCeremony) return `❌ ខ្ញុំរកមិនឃើញកម្មវិធីឈ្មោះ "${args.ceremonyTitle}" ទេ។`;
+
+        const allServices = await getServices(undefined, 1, 1000);
+        const targetService = allServices.data.find(s => s.name.toLowerCase().includes(String(args.serviceName || '').toLowerCase()));
+        if (!targetService) return `❌ ខ្ញុំរកមិនឃើញសេវាកម្មឈ្មោះ "${args.serviceName}" ទេ។`;
+
+        const quantity = Math.max(1, Math.round(Number(args.quantity) || 1));
+        const booking = await createBooking({
+            serviceId: targetService.id,
+            ceremonyId: targetCeremony.id,
+            bookedByUserId: user.id,
+            bookedByUserName: user.name,
+            providerId: targetService.providerId,
+            providerName: targetService.providerName,
+            date: args.date || targetCeremony.date,
+            startTime: args.startTime || '08:00',
+            endTime: args.endTime || '17:00',
+            serviceName: targetService.name,
+            quantity,
+            unitPrice: targetService.price
+        });
+        return `✅ បានផ្ញើសំណើកក់ « ${targetService.name} » សម្រាប់ « ${targetCeremony.title} »។\n` +
+            `ចំនួន៖ ${quantity}${targetService.unitLabel ? ` ${targetService.unitLabel}` : ''} • សរុប៖ ${formatMoney(booking.price)}\n` +
+            `អ្នកអាចពិភាក្សាតម្លៃជាមួយអ្នកផ្តល់សេវាដោយផ្ទាល់ក្នុងទំព័រការកក់។`;
+    }
+
+    return "ខ្ញុំមិនអាចអនុវត្តសំណើនេះបានទេ។";
+};
+
+// The chat assistant. `snapshot` is the user's live data (see
+// getAssistantSnapshot) — it both grounds the model and powers the offline
+// answers, so replies stay specific to this user in either mode.
+export const chatWithAI = async (snapshot: AssistantSnapshot, history: ChatTurn[]): Promise<string> => {
+    const lastUserText = [...history].reverse().find(t => t.role === 'user')?.text || '';
+
+    try {
+        const result = await callGeminiFunction(
+            'generateContent',
+            {
+                model: TEXT_MODEL,
+                contents: toGeminiContents(history),
+                config: {
+                    systemInstruction: buildSystemInstruction(snapshot),
+                    tools: [{ functionDeclarations: [createCeremonyTool, bookServiceTool] }]
+                }
+            },
+            () => buildOfflineAssistantResponse(lastUserText, snapshot)
+        );
+
+        const functionCalls = result?.functionCalls;
+        if (functionCalls && functionCalls.length > 0) {
+            const messages: string[] = [];
+            if (result.text) messages.push(result.text);
+            for (const call of functionCalls) {
+                try {
+                    messages.push(await runAssistantTool(call));
+                } catch (toolError: any) {
+                    console.error('Assistant tool failed:', toolError);
+                    messages.push(`❌ ខ្ញុំមិនអាចអនុវត្តសកម្មភាពនេះបានទេ៖ ${toolError?.message || 'មានបញ្ហាបច្ចេកទេស'}`);
+                }
+            }
+            return messages.filter(Boolean).join('\n\n');
+        }
+
+        // An empty model answer is not an answer — fall back to the local one.
+        return result?.text || buildOfflineAssistantResponse(lastUserText, snapshot).text;
     } catch (error) {
-        console.error(error);
-        return "មានបញ្ហាបច្ចេកទេសក្នុងការភ្ជាប់ទៅកាន់ AI។ សូមព្យាយាមម្តងទៀត។";
+        console.error('chatWithAI failed:', error);
+        return buildOfflineAssistantResponse(lastUserText, snapshot).text;
     }
 };

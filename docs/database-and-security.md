@@ -6,7 +6,7 @@ File: `supabase/schema.sql` (plus `supabase/add_timestamps.sql`,
 PITHI's backend is Postgres on Supabase. `schema.sql` defines the tables, atomic
 helper functions, Row-Level-Security (RLS) policies, and an auth trigger.
 
-## Tables (15)
+## Tables (18)
 
 | Table | Purpose | Key type |
 |-------|---------|----------|
@@ -25,6 +25,9 @@ helper functions, Row-Level-Security (RLS) policies, and an auth trigger.
 | `post_reactions` | LIKE / USEFUL / FAKE (unique per user+post) | bigint |
 | `post_bookmarks` | Saved posts (unique per user+post) | bigint |
 | `post_comments` | Feed comments | bigint |
+| `notifications` | Per-user inbox, written only by triggers | bigint |
+| `direct_messages` | One-to-one chat, optional photo/voice attachment | bigint |
+| `announcements` | Broadcast to a ceremony's guests or a vendor's clients | bigint |
 
 Every table carries `createdAt` / `updatedAt` / `deletedAt` columns. Roles are
 enforced as `text` check-constraints matching the `UserRole` enum. Column names
@@ -39,10 +42,19 @@ are quoted camelCase to match the TypeScript models directly.
 - **`get_my_role()`** — a `security definer`, `stable` function returning the
   caller's role; used throughout the RLS policies to avoid recursive `users`
   lookups.
+- **`push_notification(...)`** — `security definer`, revoked from clients. Every
+  notification row is written by a trigger through this function, so a user can
+  never forge one for somebody else. It skips notifying the actor themselves.
+- **`get_public_invitation(ceremony)`** — returns the handful of columns a shared
+  invitation link needs. Granted to `anon`, because RLS otherwise hides
+  `ceremonies` from a guest who is not signed in.
+- **`rsvp_to_ceremony(ceremony, name, phone, guestType)`** — the write side of the
+  same flow: validates the name, refuses past ceremonies, de-duplicates repeat
+  submissions, and inserts the guest as `ACCEPTED`. Granted to `anon`.
 
 ## Row-Level Security
 
-RLS is enabled on all 15 tables, with per-operation policies. The general model:
+RLS is enabled on all 18 tables, with per-operation policies. The general model:
 
 - **Public-readable directories:** `users`, `services`, `guests`, `reviews`,
   `invitation_templates`, and all social tables allow `select` to everyone (so the
@@ -56,10 +68,27 @@ RLS is enabled on all 15 tables, with per-operation policies. The general model:
 - **Transactions & reported transactions** are scoped to the ceremony's
   organizer/owner (plus, for reports, the guest who filed them). Guests can insert
   a report; only planners/admins confirm or delete.
+- **Direct messages** are readable only by their sender and recipient; you may
+  only insert rows where `senderId = auth.uid()`.
+- **Announcements** are readable by the author, the ceremony's planners and
+  guests (for `CEREMONY_GUESTS`), or the vendor's clients (for `VENDOR_CLIENTS`).
+  Insert requires you to be a planner of the ceremony you are addressing.
+- **Notifications** allow select/update/delete of your own rows only — and there
+  is deliberately **no insert policy**; the triggers below are the only writers.
 - **Social writes** (posts, reactions, bookmarks, comments) require the row's
   `authorId`/`userId` to equal `auth.uid()`; edits/deletes are limited to the
   author or an admin.
 - **Admin override:** `get_my_role() = 'ADMIN'` grants access across policies.
+
+## Notification triggers
+
+Rows are fanned out server-side so nothing depends on a client staying open:
+`notify_on_booking_created`, `notify_on_booking_status_change`,
+`notify_on_booking_comment`, `notify_on_guest_rsvp` (status change),
+**`notify_on_guest_added`** (a link RSVP is an INSERT, not an UPDATE — without
+this one the owner never hears about guests who signed up through a shared
+link), `notify_on_review_created`, `notify_on_gift_reported`,
+`notify_on_direct_message`, and `fanout_announcement`.
 
 ## Auth trigger
 

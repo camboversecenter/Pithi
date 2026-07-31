@@ -56,6 +56,7 @@ export interface Ceremony {
   organizerId: string; // Created by
   ownerId?: string; // Assigned to General User
   location?: string;
+  mapUrl?: string; // Google Maps link to the venue
   budget?: number;
   invitationMessage?: string;
   themeColor?: string;
@@ -87,10 +88,16 @@ export interface Service {
   description: string;
   price: number;
   priceNote?: string;
+  /** What one unit of `price` buys — e.g. "តុ" (table), "ថ្ងៃ" (day). */
+  unitLabel?: string;
   location: string;
   locationType?: 'FIXED' | 'FLEXIBLE';
   mapUrl?: string;
   imageUrl?: string;
+  /** Vendor's bank/KHQR image guests use to pay the deposit. */
+  paymentQrUrl?: string;
+  /** Share of the total requested up-front, in percent (default 50). */
+  depositPercent?: number;
   createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
@@ -110,8 +117,13 @@ export interface Booking {
   endTime: string;   
   status: BookingStatus;
   serviceName: string;
+  /** Total price of the booking (unitPrice × quantity). */
   price: number;
-  createdAt?: string; 
+  /** How many units were booked — e.g. 30 tables. */
+  quantity?: number;
+  /** Price of a single unit at the time of booking. */
+  unitPrice?: number;
+  createdAt?: string;
   updatedAt?: string;
   deletedAt?: string | null;
 }
@@ -182,6 +194,8 @@ export interface Invitation extends Guest {
     bannerUrl?: string;
 }
 
+export type ChatAttachmentType = 'IMAGE' | 'AUDIO';
+
 export interface BookingComment {
   id: string;
   bookingId: string;
@@ -189,6 +203,8 @@ export interface BookingComment {
   userName: string;
   role: UserRole;
   content: string;
+  attachmentUrl?: string;
+  attachmentType?: ChatAttachmentType | null;
   timestamp: string;
   createdAt?: string;
   updatedAt?: string;
@@ -212,7 +228,8 @@ export interface BookingLog {
 
 export type NotificationType =
     'BOOKING_CREATED' | 'BOOKING_STATUS' | 'BOOKING_COMMENT' |
-    'GUEST_RSVP' | 'REVIEW' | 'GIFT_REPORTED';
+    'GUEST_RSVP' | 'REVIEW' | 'GIFT_REPORTED' |
+    'MESSAGE' | 'ANNOUNCEMENT';
 
 // Named AppNotification to avoid clashing with the DOM Notification API.
 export interface AppNotification {
@@ -223,6 +240,55 @@ export interface AppNotification {
     body?: string;
     link?: string; // In-app route, e.g. '/booking/12'
     isRead: boolean;
+    createdAt: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
+}
+
+// --- DIRECT MESSAGES ---
+
+// One-to-one chat between any two accounts (owner ↔ vendor, owner ↔ organizer,
+// organizer ↔ vendor). Bookings are not required, so a client can negotiate
+// terms with a provider before committing to anything.
+export interface DirectMessage {
+    id: string;
+    senderId: string;
+    senderName: string;
+    recipientId: string;
+    recipientName: string;
+    content: string;
+    attachmentUrl?: string;
+    attachmentType?: ChatAttachmentType | null;
+    isRead: boolean;
+    createdAt: string;
+    updatedAt?: string;
+    deletedAt?: string | null;
+}
+
+export interface Conversation {
+    partnerId: string;
+    partnerName: string;
+    partnerRole?: string;
+    partnerAvatarUrl?: string;
+    lastMessage: string;
+    lastMessageAt: string;
+    unreadCount: number;
+}
+
+// --- ANNOUNCEMENTS ---
+
+export type AnnouncementAudience = 'CEREMONY_GUESTS' | 'VENDOR_CLIENTS';
+
+export interface Announcement {
+    id: string;
+    authorId: string;
+    authorName: string;
+    authorRole: string;
+    audience: AnnouncementAudience;
+    ceremonyId?: string | null;
+    title: string;
+    message: string;
+    recipientCount?: number;
     createdAt: string;
     updatedAt?: string;
     deletedAt?: string | null;

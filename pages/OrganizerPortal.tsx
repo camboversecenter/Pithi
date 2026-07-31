@@ -3,14 +3,16 @@ import { useState, useEffect } from 'react';
 import { getCurrentUser } from '../services/authService';
 import { 
     getCeremonies, createCeremony, updateCeremony, deleteCeremony, 
-    getGuests, getInvitationTemplates, getCeremonyById
+    getGuests, getInvitationTemplates, getCeremonyById, isCeremonyExpired
 } from '../services/dataService';
 import { uploadImage, deleteImage } from '../services/storageService';
 import { Ceremony, UserRole, Guest, InvitationTemplate } from '../types';
 import { Button, Pagination } from '../components/UIComponents';
-import { Plus, Calendar, MapPin, Edit2, Trash2, Image as ImageIcon, ArrowLeft, Briefcase, Eye, Loader2 } from 'lucide-react';
+import { CalendarClock, History, Plus, Calendar, MapPin, Edit2, Trash2, Image as ImageIcon, ArrowLeft, Briefcase, Eye, Loader2 } from 'lucide-react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 import { useSearchParams } from 'react-router-dom';
+import { CeremonyStatusBadge } from '../components/CeremonyStatusBadge';
+import AnnouncementsPanel from '../components/AnnouncementsPanel';
 
 // Components
 import OrganizerOverview from '../components/Organizer/OrganizerOverview';
@@ -29,6 +31,9 @@ const OrganizerPortal = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
+    // Past and upcoming events are separated so a finished ceremony never sits
+    // in the middle of the ones still being planned.
+    const [timeFilter, setTimeFilter] = useState<'UPCOMING' | 'PAST' | 'ALL'>('UPCOMING');
 
     // Form State
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,7 +42,7 @@ const OrganizerPortal = () => {
     
     // Detail State
     const [selectedCeremony, setSelectedCeremony] = useState<Ceremony | null>(null);
-    const [activeDetailTab, setActiveDetailTab] = useState<'OVERVIEW' | 'GUESTS' | 'INVITATIONS' | 'PLAN'>('OVERVIEW');
+    const [activeDetailTab, setActiveDetailTab] = useState<'OVERVIEW' | 'GUESTS' | 'INVITATIONS' | 'ANNOUNCEMENTS' | 'PLAN'>('OVERVIEW');
     
     // Sub-data states
     const [detailGuests, setDetailGuests] = useState<Guest[]>([]);
@@ -52,13 +57,13 @@ const OrganizerPortal = () => {
                 setSelectedCeremony(null);
             }
         }
-    }, [user, page, ceremonyIdParam, isFormOpen]);
+    }, [user, page, timeFilter, ceremonyIdParam, isFormOpen]);
 
     const loadCeremonies = async () => {
         if (!user) return;
         setIsLoading(true);
         try {
-            const res = await getCeremonies(user.id, UserRole.ORGANIZER, page, 9, 'ALL');
+            const res = await getCeremonies(user.id, UserRole.ORGANIZER, page, 9, timeFilter);
             setCeremonies(res.data);
             setTotalPages(res.totalPages);
         } finally {
@@ -119,6 +124,13 @@ const OrganizerPortal = () => {
             await showAlert("ទិន្នន័យមិនគ្រប់គ្រាន់", "សូមបញ្ចូលឈ្មោះ និងកាលបរិច្ឆេទ។", "warning");
             return;
         }
+        // "ផ្សេងៗ" must keep whatever the owner typed — defaulting an empty
+        // type to a wedding is what made every custom event display as one.
+        const ceremonyType = (data.type || '').trim();
+        if (!ceremonyType) {
+            await showAlert("ប្រភេទកម្មវិធី", "សូមជ្រើសរើស ឬបញ្ចូលប្រភេទកម្មវិធី។", "warning");
+            return;
+        }
         setIsSavingCeremony(true);
         try {
             let bannerUrl = data.bannerUrl;
@@ -141,7 +153,7 @@ const OrganizerPortal = () => {
                 organizerId: user.id,
                 ownerId: (data.ownerId && data.ownerId.trim() !== '') ? data.ownerId : user.id,
                 ...data,
-                type: data.type || 'អាពាហ៍ពិពាហ៍',
+                type: ceremonyType,
                 bannerUrl,
                 khqrUrl
             };
@@ -235,7 +247,7 @@ const OrganizerPortal = () => {
 
                 {/* Tabs */}
                 <div className="flex overflow-x-auto pb-2 space-x-2 no-scrollbar">
-                    {['OVERVIEW', 'GUESTS', 'INVITATIONS', 'PLAN'].map((tab) => (
+                    {['OVERVIEW', 'GUESTS', 'INVITATIONS', 'ANNOUNCEMENTS', 'PLAN'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveDetailTab(tab as any)}
@@ -244,6 +256,7 @@ const OrganizerPortal = () => {
                             {tab === 'OVERVIEW' && 'ទូទៅ'}
                             {tab === 'GUESTS' && `ភ្ញៀវ (${detailGuests.length})`}
                             {tab === 'INVITATIONS' && 'លិខិតអញ្ជើញ'}
+                            {tab === 'ANNOUNCEMENTS' && 'ជូនដំណឹង'}
                             {tab === 'PLAN' && 'ផែនការ'}
                         </button>
                     ))}
@@ -252,10 +265,11 @@ const OrganizerPortal = () => {
                 {/* Content */}
                 <div className="min-h-[400px]">
                      {activeDetailTab === 'OVERVIEW' && (
-                        <OrganizerOverview 
-                            ceremony={selectedCeremony} 
-                            guestCount={detailGuests.length} 
-                            budget={selectedCeremony.budget || 0} 
+                        <OrganizerOverview
+                            ceremony={selectedCeremony}
+                            guestCount={detailGuests.length}
+                            budget={selectedCeremony.budget || 0}
+                            currentUserId={user.id}
                         />
                     )}
 
@@ -274,6 +288,15 @@ const OrganizerPortal = () => {
                             templates={templates} 
                             onRefresh={refreshDetailData}
                             currentUser={user}
+                        />
+                    )}
+
+                    {activeDetailTab === 'ANNOUNCEMENTS' && (
+                        <AnnouncementsPanel
+                            currentUser={user}
+                            audience="CEREMONY_GUESTS"
+                            ceremonyId={selectedCeremony.id}
+                            recipientHint={`ភ្ញៀវ និងម្ចាស់កម្មវិធី « ${selectedCeremony.title} » នឹងទទួលបានការជូនដំណឹងភ្លាមៗ។`}
                         />
                     )}
 
@@ -300,6 +323,23 @@ const OrganizerPortal = () => {
                 <p className="text-slate-500 text-lg">បង្កើត និងគ្រប់គ្រងកម្មវិធីសម្រាប់អតិថិជនរបស់អ្នក។</p>
             </div>
 
+
+            <div className="flex p-1 bg-slate-100 rounded-xl w-fit">
+                {([['UPCOMING', 'ខាងមុខ'], ['PAST', 'កន្លងផុត'], ['ALL', 'ទាំងអស់']] as const).map(([value, label]) => (
+                    <button
+                        key={value}
+                        onClick={() => { setTimeFilter(value); setPage(1); }}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                            timeFilter === value ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        {value === 'UPCOMING' && <CalendarClock size={16} />}
+                        {value === 'PAST' && <History size={16} />}
+                        {label}
+                    </button>
+                ))}
+            </div>
+
             {isLoading ? (
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin w-10 h-10 text-blue-300"/></div>
             ) : (
@@ -311,12 +351,18 @@ const OrganizerPortal = () => {
                         >
                             <div className="h-48 bg-slate-200 relative overflow-hidden">
                                 {c.bannerUrl ? (
-                                    <img src={c.bannerUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    <img
+                                        src={c.bannerUrl}
+                                        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isCeremonyExpired(c.date) ? 'grayscale opacity-80' : ''}`}
+                                    />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-slate-400"><ImageIcon size={32}/></div>
                                 )}
-                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold shadow-sm uppercase tracking-wider">
-                                    {c.type}
+                                <div className="absolute top-4 right-4 flex flex-col items-end gap-1.5">
+                                    <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold shadow-sm uppercase tracking-wider">
+                                        {c.type}
+                                    </span>
+                                    <CeremonyStatusBadge date={c.date} className="shadow-sm backdrop-blur" />
                                 </div>
                             </div>
                             <div className="p-6 flex-1 flex flex-col">
@@ -344,7 +390,13 @@ const OrganizerPortal = () => {
                     )) : (
                         <div className="col-span-full py-20 text-center text-slate-400 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
                              <Calendar size={48} className="mx-auto mb-4 opacity-50"/>
-                             <p>អ្នកមិនទាន់មានកម្មវិធីទេ។ សូមបង្កើតថ្មី។</p>
+                             <p>
+                                {timeFilter === 'PAST'
+                                    ? 'មិនទាន់មានកម្មវិធីកន្លងផុតទេ។'
+                                    : timeFilter === 'UPCOMING'
+                                        ? 'គ្មានកម្មវិធីខាងមុខទេ។ សូមបង្កើតថ្មី។'
+                                        : 'អ្នកមិនទាន់មានកម្មវិធីទេ។ សូមបង្កើតថ្មី។'}
+                             </p>
                         </div>
                     )}
                 </div>

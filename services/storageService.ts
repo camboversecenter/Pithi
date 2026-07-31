@@ -3,7 +3,11 @@ import { supabase } from './supabaseConfig';
 
 const BUCKET_NAME = 'PITHI';
 
-export const uploadImage = async (file: File, folder: 'services' | 'ceremonies' | 'receipts' | 'templates'): Promise<string> => {
+export type StorageFolder = 'services' | 'ceremonies' | 'receipts' | 'templates' | 'chat';
+
+// Also used for chat attachments (photos and voice notes) — the upload path is
+// identical, only the folder differs.
+export const uploadImage = async (file: File, folder: StorageFolder): Promise<string> => {
     // Helper to read file as elegant Base64 Data URL for local testing fallback
     const readAsDataURL = (f: File): Promise<string> => {
         return new Promise((resolve) => {

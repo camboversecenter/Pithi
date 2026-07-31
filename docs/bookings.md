@@ -30,8 +30,11 @@ A unified list for both sides of a booking. Role decides the perspective inside
 - **Vendors** see bookings placed against their services (`providerId`).
 
 Two tabs — `ការកក់បច្ចុប្បន្ន` (upcoming, `date ≥ today`) and `ការកក់ចាស់ៗ`
-(past, `date < today`) — over a table of ceremony, service, date/time, price,
+(past, `date < today`) — over a table of ceremony, service, date/time, price
+(with the `quantity × unitPrice` breakdown when more than one unit was booked),
 status badge, and a details link to `/booking/:id`. Paginated 10 per page.
+`/bookings` is in the navigation for **every** role, and each entry in the
+dashboard activity feed links straight to its `/booking/:id` record.
 
 ## Booking Detail (`/booking/:id`)
 
@@ -44,8 +47,11 @@ Two flags govern everything:
 
 ### Layout
 - **Service info card** — image, name, description, location/map link, and a grid
-  of date, time, and **total price** (`booking.price`, the snapshot taken at
-  booking time).
+  of date, time, **quantity** (`quantity` × `unitPrice`, e.g. 30 tables × $200)
+  and **total price** (`booking.price`, the snapshot taken at booking time).
+- **Deposit card** — when the vendor uploaded a payment QR (`paymentQrUrl`), the
+  client sees it here together with the computed deposit
+  (`price × depositPercent / 100`, default 50%).
 - **Party card** — shows `អតិថិជន` (customer) to the provider, or
   `អ្នកផ្តល់សេវា` (provider) to the client.
 - **Ceremony summary** — title, type, location, and a "Go to ceremony" button
@@ -60,9 +66,12 @@ Provider (while not past):
 - Any time → **Edit schedule** (`កែប្រែកាលវិភាគ`) — date/start/end, recorded to
   the log as a `SCHEDULE_CHANGE`
 
-Client/booker (while not past):
-- PENDING → **Delete booking** (`លុបការកក់`, hard delete)
-- CONFIRMED → **Cancel** (→ CANCELLED)
+Client/booker (while not past, and not already cancelled):
+- **Edit booking** (`កែប្រែការកក់`) — date, start/end time and quantity. A
+  quantity change re-prices the booking (`updateBookingQuantity`) and is written
+  to the log as `QUANTITY_CHANGE`.
+- **Cancel booking** (`បោះបង់ការកក់` → CANCELLED) at any stage.
+- PENDING → **Delete** (`លុបចោល`, hard delete) as well.
 - Clients cannot confirm or complete.
 
 Any move to CANCELLED prompts a confirmation dialog. Once a booking is past, all
@@ -72,8 +81,13 @@ terminal in the UI.
 ### Activity feed: comments + audit log
 The feed merges two streams, sorted by time:
 - **Comments** — chat bubbles (right/rose for you, left/white for the other
-  party). `addBookingComment` posts a new message; Enter sends. The input is
-  disabled on past bookings.
+  party). `addBookingComment` posts a new message; the shared `ChatComposer`
+  sends text, a **photo**, or a **voice note** (recorded with `MediaRecorder`,
+  uploaded to the `chat/` folder of the PITHI bucket and stored on the comment as
+  `attachmentUrl` / `attachmentType`). The input is disabled on past bookings.
+  A "ផ្ញើសារផ្ទាល់" link opens a direct thread with the other party
+  (see `messaging-and-announcements.md`) for negotiation outside a single
+  booking.
 - **Logs** — centered gray system pills. Written automatically by the data layer:
   `CREATED` on booking creation and `SCHEDULE_CHANGE` on reschedule (via
   `addBookingLog`). Logs are read-only audit records.
@@ -81,7 +95,11 @@ The feed merges two streams, sorted by time:
 ## Related data functions
 
 `getBookings`, `getBookingsByService`, `getBookingById`, `createBooking`,
-`updateBookingStatus`, `updateBookingSchedule`, `deleteBooking`,
-`getBookingComments`, `addBookingComment`, `getBookingLogs` — all with the
-Supabase ⇄ localStorage fallback. None of the booking screens use AI.
+`updateBookingStatus`, `updateBookingSchedule`, `updateBookingQuantity`,
+`deleteBooking`, `getBookingComments`, `addBookingComment`, `getBookingLogs` —
+all with the Supabase ⇄ localStorage fallback, except writes that another person
+must see (comments, bookings), which surface the error instead of silently
+storing a copy only the sender can read. `resolveBookingTotals` is the single
+place where `unitPrice × quantity` becomes `price`. None of the booking screens
+use AI.
 </content>

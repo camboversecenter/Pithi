@@ -25,7 +25,8 @@ For a quick project overview and setup instructions, see the
 | [organizer-portal.md](organizer-portal.md) | Planner workflows: ceremonies, guests, invitations, plans, owner assignment |
 | [owner-portal.md](owner-portal.md) | Host workflows and the budget/finance tab |
 | [marketplace-and-services.md](marketplace-and-services.md) | Vendor service listings and client discovery/booking |
-| [bookings.md](bookings.md) | The booking lifecycle, statuses, comments, and audit log |
+| [bookings.md](bookings.md) | The booking lifecycle, statuses, quantities, deposits, comments, and audit log |
+| [messaging-and-announcements.md](messaging-and-announcements.md) | One-to-one chat (with photos and voice notes) and broadcast announcements |
 | [invitations-and-rsvp.md](invitations-and-rsvp.md) | Digital invitations, RSVP, and guest gift/transfer reporting |
 | [community-feed.md](community-feed.md) | The community knowledge feed: posts, reactions, bookmarks, comments |
 | [admin-dashboard.md](admin-dashboard.md) | System stats, user/admin management, and data cleanup |
@@ -46,6 +47,7 @@ For a quick project overview and setup instructions, see the
 | `GENERAL_USER` (event owner) | [Owner Portal](owner-portal.md), [Marketplace](marketplace-and-services.md) |
 | `ORGANIZER` | [Organizer Portal](organizer-portal.md), [Marketplace](marketplace-and-services.md) |
 | `CHEF` / `HALL` / `MUSIC_BAND` / `BEAUTY_SALON` | [Vendor services](marketplace-and-services.md), [Bookings](bookings.md) |
+| `ORGANIZER` (as a seller) | Lists a coordination service in the same [marketplace](marketplace-and-services.md) so clients can find and message one |
 | `ADMIN` | [Admin Dashboard](admin-dashboard.md) |
 
 ## A note on accuracy

@@ -26,9 +26,11 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const UserGuide = lazy(() => import('./pages/UserGuide'));
 const SocialFeed = lazy(() => import('./pages/SocialFeed'));
 const Notifications = lazy(() => import('./pages/Notifications'));
+const Messages = lazy(() => import('./pages/Messages'));
 
 // Icons
-import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send, Bell } from 'lucide-react';
+import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send, Bell, MessagesSquare } from 'lucide-react';
+import { getUnreadMessageCount, subscribeToMessages } from './services/chatService';
 
 const PrivateRoute = ({ children }: { children?: React.ReactNode }) => {
   const user = getCurrentUser();
@@ -46,6 +48,39 @@ const RoleRoute = ({ roles, children }: { roles: UserRole[], children?: React.Re
 };
 
 const VENDOR_ROLES = [UserRole.CHEF, UserRole.HALL, UserRole.MUSIC_BAND, UserRole.BEAUTY_SALON];
+// Organizers sell their coordination service in the same marketplace as the
+// vendors, so they get the same service-management portal.
+const SERVICE_PROVIDER_ROLES = [...VENDOR_ROLES, UserRole.ORGANIZER];
+
+const isVendorRole = (role: UserRole | string) =>
+    ['CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON'].includes(role as string);
+
+// Unread direct messages, kept live for the nav badge.
+const useUnreadMessages = (userId?: string) => {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+        if (!userId) {
+            setCount(0);
+            return;
+        }
+        let cancelled = false;
+        const refresh = async () => {
+            const value = await getUnreadMessageCount(userId);
+            if (!cancelled) setCount(value);
+        };
+        refresh();
+        const interval = setInterval(refresh, 60_000);
+        const unsubscribe = subscribeToMessages(userId, () => setCount(c => c + 1));
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            unsubscribe();
+        };
+    }, [userId]);
+
+    return count;
+};
 
 // --- NAVIGATION COMPONENTS ---
 
@@ -60,16 +95,17 @@ const MobileBottomNav = ({ user, activePath }: { user: User, activePath: string 
     if (user.role === UserRole.GENERAL_USER) {
         navItems.push({ to: "/owner", icon: Wallet, label: "របស់ខ្ញុំ" });
     }
-    if (['CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON'].includes(user.role)) {
+    if (isVendorRole(user.role)) {
         navItems.push({ to: "/vendor", icon: Briefcase, label: "សេវា" });
-        navItems.push({ to: "/bookings", icon: List, label: "ការកក់" });
     }
-    
-    // Social Feed for everyone
-    navItems.push({ to: "/community", icon: MessageSquare, label: "សហគមន៍" });
+
+    // Everyone who can hold a booking needs to reach it — the client side of a
+    // booking was previously only reachable from the dashboard feed.
+    navItems.push({ to: "/bookings", icon: List, label: "ការកក់" });
+    navItems.push({ to: "/messages", icon: MessagesSquare, label: "សារ" });
 
     // Marketplace unless Vendor
-    if (!['CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON'].includes(user.role)) {
+    if (!isVendorRole(user.role)) {
          navItems.push({ to: "/marketplace", icon: Search, label: "ទីផ្សារ" });
     }
 
@@ -105,6 +141,7 @@ const UnreadCountBadge = ({ count, className = '' }: { count: number, className?
 
 const DesktopSidebar = ({ user, activePath, onLogout }: { user: User, activePath: string, onLogout: () => void }) => {
     const { unreadCount } = useNotifications();
+    const unreadMessages = useUnreadMessages(user.id);
     const NavItem = ({ to, icon: Icon, label, badge = 0 }: any) => {
         const isActive = activePath === to;
         return (
@@ -133,18 +170,17 @@ const DesktopSidebar = ({ user, activePath, onLogout }: { user: User, activePath
                 {user.role === UserRole.ORGANIZER && <NavItem to="/organizer" icon={Calendar} label="គ្រប់គ្រងកម្មវិធី" />}
                 {user.role === UserRole.GENERAL_USER && <NavItem to="/owner" icon={Wallet} label="កម្មវិធីរបស់ខ្ញុំ" />}
                 
+                <NavItem to="/messages" icon={MessagesSquare} label="សារឆ្លើយឆ្លង" badge={unreadMessages} />
                 <NavItem to="/community" icon={MessageSquare} label="សហគមន៍" />
                 <NavItem to="/notifications" icon={Bell} label="ការជូនដំណឹង" badge={unreadCount} />
 
-                {(!['CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON'].includes(user.role)) && (
+                {!isVendorRole(user.role) && (
                     <NavItem to="/marketplace" icon={Search} label="ទីផ្សារសេវាកម្ម" />
                 )}
-                {['CHEF', 'HALL', 'MUSIC_BAND', 'BEAUTY_SALON'].includes(user.role) && (
-                    <>
-                        <NavItem to="/vendor" icon={Briefcase} label="សេវាកម្ម" />
-                        <NavItem to="/bookings" icon={List} label="ការកក់" />
-                    </>
+                {SERVICE_PROVIDER_ROLES.includes(user.role) && (
+                    <NavItem to="/vendor" icon={Briefcase} label="សេវាកម្ម" />
                 )}
+                <NavItem to="/bookings" icon={List} label="ការកក់" />
                 {user.role === UserRole.ADMIN && (
                     <NavItem to="/admin" icon={ShieldCheck} label="គ្រប់គ្រងប្រព័ន្ធ" />
                 )}
@@ -269,11 +305,12 @@ const App = () => {
             <Route path="/" element={<Layout><PrivateRoute><Dashboard /></PrivateRoute></Layout>} />
             <Route path="/community" element={<Layout><PrivateRoute><SocialFeed /></PrivateRoute></Layout>} />
             <Route path="/notifications" element={<Layout><PrivateRoute><Notifications /></PrivateRoute></Layout>} />
+            <Route path="/messages" element={<Layout><PrivateRoute><Messages /></PrivateRoute></Layout>} />
             <Route path="/admin" element={<Layout><RoleRoute roles={[UserRole.ADMIN]}><AdminDashboard /></RoleRoute></Layout>} />
             <Route path="/organizer" element={<Layout><RoleRoute roles={[UserRole.ORGANIZER]}><OrganizerPortal /></RoleRoute></Layout>} />
             <Route path="/owner" element={<Layout><RoleRoute roles={[UserRole.GENERAL_USER]}><OwnerPortal /></RoleRoute></Layout>} />
             <Route path="/invited" element={<Layout><PrivateRoute><InvitedCeremonies /></PrivateRoute></Layout>} />
-            <Route path="/vendor" element={<Layout><RoleRoute roles={VENDOR_ROLES}><VendorPortal /></RoleRoute></Layout>} />
+            <Route path="/vendor" element={<Layout><RoleRoute roles={SERVICE_PROVIDER_ROLES}><VendorPortal /></RoleRoute></Layout>} />
             <Route path="/marketplace" element={<Layout><PrivateRoute><Marketplace /></PrivateRoute></Layout>} />
             <Route path="/bookings" element={<Layout><PrivateRoute><BookingHistory /></PrivateRoute></Layout>} />
             <Route path="/booking/:id" element={<Layout><PrivateRoute><BookingDetail /></PrivateRoute></Layout>} />

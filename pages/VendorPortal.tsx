@@ -6,7 +6,8 @@ import { generateServiceDescription, generateServicePhoto } from '../services/ge
 import { uploadImage, deleteImage } from '../services/storageService';
 import { Service, Review } from '../types';
 import { Card, Button, Input, Modal, Pagination, Select } from '../components/UIComponents';
-import { Plus, MapPin, Edit2, Trash2, Image as ImageIcon, Globe, Briefcase, Sparkles, Loader2, AlertCircle, Wand2, Star } from 'lucide-react';
+import AnnouncementsPanel from '../components/AnnouncementsPanel';
+import { Plus, MapPin, Edit2, Trash2, Image as ImageIcon, Globe, Briefcase, Sparkles, Loader2, AlertCircle, Wand2, Star, QrCode, Megaphone } from 'lucide-react';
 import { useGlobalDialog } from '../contexts/GlobalDialogContext';
 
 const VendorPortal = () => {
@@ -25,8 +26,10 @@ const VendorPortal = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentService, setCurrentService] = useState<Partial<Service>>({});
-    const [imageFile, setImageFile] = useState<File | null>(null); 
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [paymentQrFile, setPaymentQrFile] = useState<File | null>(null);
     const [error, setError] = useState('');
+    const [activeTab, setActiveTab] = useState<'SERVICES' | 'ANNOUNCEMENTS'>('SERVICES');
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -99,15 +102,32 @@ const VendorPortal = () => {
                 imageUrlVal = `https://picsum.photos/400/300?random=${Date.now()}`;
             }
 
+            // Deposit QR: vendors who ask for money up-front need somewhere to
+            // put the QR the client scans.
+            let paymentQrUrlVal = currentService.paymentQrUrl;
+            if (paymentQrFile) {
+                if (isEditing && currentService.paymentQrUrl) {
+                    await deleteImage(currentService.paymentQrUrl);
+                }
+                paymentQrUrlVal = await uploadImage(paymentQrFile, 'services');
+            }
+
+            const depositPercent = currentService.depositPercent === undefined || String(currentService.depositPercent) === ''
+                ? 50
+                : Math.min(100, Math.max(0, Number(currentService.depositPercent)));
+
             const servicePayload = {
                 name: currentService.name,
                 description: currentService.description || '',
                 price: Number(currentService.price),
                 priceNote: currentService.priceNote || '',
+                unitLabel: currentService.unitLabel || '',
                 location: locationVal,
                 locationType: type,
                 mapUrl: mapUrlVal || '',
                 imageUrl: imageUrlVal,
+                paymentQrUrl: paymentQrUrlVal || '',
+                depositPercent,
                 providerId: user.id,
                 providerName: user.name,
                 role: user.role
@@ -122,6 +142,7 @@ const VendorPortal = () => {
             setIsModalOpen(false);
             setCurrentService({});
             setImageFile(null);
+            setPaymentQrFile(null);
             await refreshServices(servicePage);
         } catch (err: any) {
             console.error("Save Service Error:", err);
@@ -191,12 +212,32 @@ const VendorPortal = () => {
                     </h1>
                     <p className="text-slate-500 mt-1">គ្រប់គ្រងសេវាកម្មដែលអ្នកផ្តល់ជូនអតិថិជន។</p>
                 </div>
-                <Button onClick={() => { setCurrentService({}); setImageFile(null); setError(''); setIsEditing(false); setIsModalOpen(true); }}>
+                <Button onClick={() => { setCurrentService({}); setImageFile(null); setPaymentQrFile(null); setError(''); setIsEditing(false); setIsModalOpen(true); }}>
                     <Plus size={20} className="mr-2"/> បន្ថែមសេវាកម្មថ្មី
                 </Button>
             </div>
 
-            {isLoading ? (
+            <div className="flex p-1 bg-slate-100 rounded-xl w-fit">
+                {([['SERVICES', 'សេវាកម្ម', Briefcase], ['ANNOUNCEMENTS', 'ជូនដំណឹង', Megaphone]] as const).map(([value, label, Icon]) => (
+                    <button
+                        key={value}
+                        onClick={() => setActiveTab(value)}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                            activeTab === value ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <Icon size={16} /> {label}
+                    </button>
+                ))}
+            </div>
+
+            {activeTab === 'ANNOUNCEMENTS' ? (
+                <AnnouncementsPanel
+                    currentUser={user}
+                    audience="VENDOR_CLIENTS"
+                    recipientHint="អតិថិជនទាំងអស់ដែលបានកក់សេវាកម្មរបស់អ្នក (រង់ចាំ បញ្ជាក់ ឬបញ្ចប់) នឹងទទួលបានសេចក្តីជូនដំណឹងនេះ។"
+                />
+            ) : isLoading ? (
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin w-8 h-8 text-rose-600"/></div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -205,7 +246,7 @@ const VendorPortal = () => {
                             <div className="relative h-48 bg-slate-100">
                                 <img src={service.imageUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={service.name} />
                                 <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-bold text-slate-700 shadow-sm flex flex-col items-end">
-                                    <span>${service.price}</span>
+                                    <span>${service.price}{service.unitLabel ? ` / ${service.unitLabel}` : ''}</span>
                                     {service.priceNote && <span className="text-[9px] text-slate-400 font-normal">{service.priceNote}</span>}
                                 </div>
                             </div>
@@ -240,7 +281,7 @@ const VendorPortal = () => {
                                     )}
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button variant="outline" className="flex-1 text-xs" onClick={() => { setCurrentService(service); setImageFile(null); setError(''); setIsEditing(true); setIsModalOpen(true); }}>
+                                    <Button variant="outline" className="flex-1 text-xs" onClick={() => { setCurrentService(service); setImageFile(null); setPaymentQrFile(null); setError(''); setIsEditing(true); setIsModalOpen(true); }}>
                                         <Edit2 size={14} className="mr-1"/> កែប្រែ
                                     </Button>
                                     <Button variant="secondary" className="text-red-600 hover:bg-red-50 border-red-100" onClick={() => handleDelete(service)}>
@@ -259,7 +300,9 @@ const VendorPortal = () => {
                 </div>
             )}
             
-            <Pagination currentPage={servicePage} totalPages={totalServicePages} onPageChange={setServicePage} />
+            {activeTab === 'SERVICES' && (
+                <Pagination currentPage={servicePage} totalPages={totalServicePages} onPageChange={setServicePage} />
+            )}
 
             {/* CREATE/EDIT MODAL */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEditing ? "កែប្រេសេវាកម្ម" : "បន្ថែមសេវាកម្មថ្មី"}>
@@ -281,11 +324,31 @@ const VendorPortal = () => {
                             onChange={e => setCurrentService({...currentService, price: e.target.value === '' ? undefined : Number(e.target.value)})} 
                             required
                          />
-                         <Input 
-                            label="សម្គាល់តម្លៃ (Price Note)" 
-                            value={currentService.priceNote || ''} 
-                            onChange={e => setCurrentService({...currentService, priceNote: e.target.value})} 
+                         <Input
+                            label="សម្គាល់តម្លៃ (Price Note)"
+                            value={currentService.priceNote || ''}
+                            onChange={e => setCurrentService({...currentService, priceNote: e.target.value})}
                             placeholder="ឧ. ក្នុងមួយតុ ឬ ចាប់ពី"
+                         />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                         {/* Charging per table only works if the client can say how
+                             many they need — this is the unit they will count. */}
+                         <Input
+                            label="ឯកតាគិតថ្លៃ"
+                            value={currentService.unitLabel || ''}
+                            onChange={e => setCurrentService({...currentService, unitLabel: e.target.value})}
+                            placeholder="ឧ. តុ, ថ្ងៃ, ម៉ោង"
+                         />
+                         <Input
+                            label="ប្រាក់កក់ (%)"
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={currentService.depositPercent === undefined ? '' : currentService.depositPercent}
+                            onChange={e => setCurrentService({...currentService, depositPercent: e.target.value === '' ? undefined : Number(e.target.value)})}
+                            placeholder="50"
                          />
                     </div>
                     
@@ -350,6 +413,43 @@ const VendorPortal = () => {
                             />
                         </div>
                         <p className="text-[10px] text-slate-400 mt-1">រូបភាពច្បាស់ជួយឱ្យអតិថិជនចាប់អារម្មណ៍កាន់តែខ្លាំង។</p>
+                    </div>
+
+                    {/* Deposit QR */}
+                    <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">QR ទទួលប្រាក់កក់ (KHQR / ធនាគារ)</label>
+                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 flex items-center gap-4">
+                            <div className="w-24 h-24 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                {(paymentQrFile || currentService.paymentQrUrl) ? (
+                                    <img
+                                        src={paymentQrFile ? URL.createObjectURL(paymentQrFile) : currentService.paymentQrUrl}
+                                        className="w-full h-full object-contain"
+                                        alt="Payment QR"
+                                    />
+                                ) : (
+                                    <QrCode size={28} className="text-slate-300" />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => { if (e.target.files?.[0]) setPaymentQrFile(e.target.files[0]); }}
+                                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                                    អតិថិជននឹងឃើញ QR នេះក្នុងទំព័រការកក់ ដើម្បីបង់ប្រាក់កក់ជាមុន។
+                                </p>
+                                {(paymentQrFile || currentService.paymentQrUrl) && (
+                                    <button
+                                        onClick={() => { setPaymentQrFile(null); setCurrentService({ ...currentService, paymentQrUrl: '' }); }}
+                                        className="text-xs text-red-500 font-bold hover:underline mt-1"
+                                    >
+                                        លុប QR
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <div>

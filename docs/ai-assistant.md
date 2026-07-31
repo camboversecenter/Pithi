@@ -23,19 +23,24 @@ The Edge Function (`gemini-proxy/index.ts`, Deno) reads `GEMINI_API_KEY` from it
 secrets and supports two actions: `generateContent` (text, JSON, vision, and
 function-calling) and `generateImages` (extracts inline base64 image data).
 
+Model IDs live in two constants at the top of `geminiService.ts` (`TEXT_MODEL`,
+`IMAGE_MODEL`). They must name models the API actually serves: an invented ID
+makes every proxy call fail, which quietly demotes the assistant to its offline
+answers for good.
+
 ## Feature catalogue
 
 | Feature | Function | Model | Fallback |
 |---------|----------|-------|----------|
-| Ceremony plan | `generateCeremonyPlan(type)` | `gemini-3.5-flash` | Rich per-type Khmer plan text (tone shifts solemn for funerals) |
-| Invitation message | `generateInvitationMessage(type, host)` | `gemini-3.5-flash` | Per-type Khmer message templates |
+| Ceremony plan | `generateCeremonyPlan(type)` | `gemini-2.5-flash` | Rich per-type Khmer plan text (tone shifts solemn for funerals) |
+| Invitation message | `generateInvitationMessage(type, host)` | `gemini-2.5-flash` | Per-type Khmer message templates |
 | Ceremony banner | `generateCeremonyBanner(type)` | `gemini-2.5-flash-image` (16:9) | **Canvas-drawn** banner (`createProceduralBanner`) |
-| Service description | `generateServiceDescription(name, role)` | `gemini-3.5-flash` | Role-specific Khmer blurb |
+| Service description | `generateServiceDescription(name, role)` | `gemini-2.5-flash` | Role-specific Khmer blurb |
 | Service photo | `generateServicePhoto(name, role)` | `gemini-2.5-flash-image` (4:3) | **Canvas-drawn** photo (`createProceduralServicePhoto`) |
 | Receipt OCR | `scanBankReceipt(image)` | `gemini-2.5-flash` (vision + JSON) | `null` |
 | Business-card OCR | `scanBusinessCard(image)` | `gemini-2.5-flash` (vision + JSON) | `null` |
-| Post moderation | `moderateSocialPost(title, content)` | `gemini-3-flash-preview` (JSON) | `{ allowed: true }` |
-| Chat assistant | `chatWithAI(context, history)` | `gemini-3-flash-preview` (tools) | Error message string |
+| Post moderation | `moderateSocialPost(title, content)` | `gemini-2.5-flash` (JSON) | `{ allowed: true }` |
+| Chat assistant | `chatWithAI(context, history)` | `gemini-2.5-flash` (tools, vision, audio) | Context-aware offline assistant |
 
 ## Tone awareness
 
@@ -55,16 +60,36 @@ a valid image either way.
 
 ## The chat assistant & function calling
 
-`chatWithAI` gives Gemini two tools — `createCeremony` and `bookService`. When the
-model calls a tool, the **client executes it** against `dataService`:
-- `createCeremony` → `createCeremony(...)` for the current user.
-- `bookService` → resolves the named ceremony and service from the user's data,
-  then `createBooking(...)`.
+`chatWithAI(snapshot, history)` takes an **`AssistantSnapshot`** — built by
+`getAssistantSnapshot(userId, role, name)` — containing the signed-in user's
+ceremonies (with UPCOMING/TODAY/PAST status), their bookings, and the current
+marketplace listings. The snapshot becomes the system instruction, so answers
+quote real titles, dates and prices instead of offering generic wedding advice.
+It is refreshed on every turn, so an event created mid-conversation is
+immediately known.
 
-This is what lets a user type "book a chef for the 20th" and have the booking
-actually created. The assistant replies in Khmer. In mock mode, the local
-simulation recognizes intent keywords and returns matching tool calls so the
-demo flow works offline.
+Two tools are exposed — `createCeremony` and `bookService`. When the model calls
+one, the **client executes it** against `dataService`:
+- `createCeremony` → `createCeremony(...)` for the current user. An unrecognised
+  type is kept verbatim (falling back to `ផ្សេងៗ`), never coerced to a wedding.
+- `bookService` → resolves the named ceremony and service from the user's data,
+  then `createBooking(...)`, including a `quantity` when the user gave one.
+
+Every tool result is reported back in the reply, and a failing tool returns the
+reason rather than a silent nothing.
+
+### Attachments
+A message can carry a **photo** or a **voice note** (`ChatComposer` →
+`ChatTurn.attachment`), sent to Gemini as `inlineData` alongside the text, so the
+assistant can look at a venue photo or listen to a spoken request.
+
+### The offline assistant
+`buildOfflineAssistantResponse(userText, snapshot)` answers from the same
+snapshot when the proxy is unreachable or the session is in mock mode: it lists
+the user's upcoming events, their bookings and totals, computes budget vs.
+committed spend, and parses "create …" / "book …" intents (extracting the type,
+the date in `YYYY-MM-DD` or `DD/MM/YYYY`, and a quoted title) into real tool
+calls. It asks for a missing date instead of inventing one.
 
 ## Configuration
 

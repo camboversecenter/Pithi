@@ -1,22 +1,57 @@
 
-import React from 'react';
-import { Ceremony } from '../../types';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Ceremony, User } from '../../types';
 import { Card, MarkdownRenderer } from '../UIComponents';
+import { CeremonyStatusBadge } from '../CeremonyStatusBadge';
+import { resolveMapLink } from '../../services/mapsService';
+import { getUserById } from '../../services/authService';
+import { ExternalLink, MapPin, MessagesSquare } from 'lucide-react';
 
 interface OwnerOverviewProps {
     ceremony: Ceremony;
     guestCount: number;
     budget: number;
+    currentUserId?: string;
 }
 
-const OwnerOverview: React.FC<OwnerOverviewProps> = ({ ceremony, guestCount, budget }) => {
+const OwnerOverview: React.FC<OwnerOverviewProps> = ({ ceremony, guestCount, budget, currentUserId }) => {
+    const mapLink = resolveMapLink(ceremony.mapUrl, ceremony.location);
+    const [organizer, setOrganizer] = useState<User | null>(null);
+    const organizerId = ceremony.organizerId && ceremony.organizerId !== currentUserId ? ceremony.organizerId : null;
+
+    useEffect(() => {
+        if (!organizerId) {
+            setOrganizer(null);
+            return;
+        }
+        getUserById(organizerId).then(setOrganizer).catch(() => setOrganizer(null));
+    }, [organizerId]);
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in-up">
             <Card title="លម្អិត" className="h-full">
                 <div className="space-y-4 text-slate-600">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase">ប្រភេទ</label>
+                            <p className="font-serif text-xl text-slate-900">{ceremony.type}</p>
+                        </div>
+                        <CeremonyStatusBadge date={ceremony.date} />
+                    </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase">ប្រភេទ</label>
-                        <p className="font-serif text-xl text-slate-900">{ceremony.type}</p>
+                        <label className="text-xs font-bold text-slate-400 uppercase">ទីតាំង</label>
+                        <p className="text-slate-800 font-medium">{ceremony.location || 'មិនទាន់កំណត់ទីតាំង'}</p>
+                        {mapLink && (
+                            <a
+                                href={mapLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:underline mt-1"
+                            >
+                                <MapPin size={12} /> ពិនិត្យលើ Google Maps <ExternalLink size={10} />
+                            </a>
+                        )}
                     </div>
                     <div>
                         <label className="text-xs font-bold text-slate-400 uppercase">ការពិពណ៌នា</label>
@@ -30,18 +65,46 @@ const OwnerOverview: React.FC<OwnerOverviewProps> = ({ ceremony, guestCount, bud
                     </div>
                 </div>
             </Card>
-            <Card title="សង្ខេប" className="h-full bg-slate-900 text-white border-none shadow-xl shadow-slate-300">
-                <div className="grid grid-cols-2 gap-6">
-                    <div>
-                        <p className="text-slate-400 text-xs font-bold uppercase">ថវិកា</p>
-                        <p className="text-3xl font-serif">${budget || 0}</p>
+            <div className="space-y-6">
+                <Card title="សង្ខេប" className="bg-slate-900 text-white border-none shadow-xl shadow-slate-300">
+                    <div className="grid grid-cols-2 gap-6">
+                        <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase">ថវិកា</p>
+                            <p className="text-3xl font-serif">${budget || 0}</p>
+                        </div>
+                        <div>
+                            <p className="text-slate-400 text-xs font-bold uppercase">ចំនួនភ្ញៀវ</p>
+                            <p className="text-3xl font-serif">{guestCount}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-slate-400 text-xs font-bold uppercase">ចំនួនភ្ញៀវ</p>
-                        <p className="text-3xl font-serif">{guestCount}</p>
-                    </div>
-                </div>
-            </Card>
+                </Card>
+
+                {/* The organizer who set this event up is reachable from here. */}
+                {organizerId && (
+                    <Card title="អ្នករៀបចំកម្មវិធី">
+                        <div className="flex items-center gap-3">
+                            <img
+                                src={organizer?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(organizer?.name || 'Organizer')}&background=random`}
+                                className="w-11 h-11 rounded-full object-cover border border-slate-200"
+                                alt=""
+                            />
+                            <div className="min-w-0 flex-1">
+                                <p className="font-bold text-slate-800 text-sm truncate">{organizer?.name || 'អ្នករៀបចំកម្មវិធី'}</p>
+                                <p className="text-xs text-slate-500 truncate">{organizer?.email || ''}</p>
+                            </div>
+                            <Link
+                                to={`/messages?with=${organizerId}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors"
+                            >
+                                <MessagesSquare size={14} /> ផ្ញើសារ
+                            </Link>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                            ចរចា និងពិភាក្សាលម្អិតនៃកម្មវិធីដោយផ្ទាល់ជាមួយអ្នករៀបចំ។
+                        </p>
+                    </Card>
+                )}
+            </div>
         </div>
     );
 };

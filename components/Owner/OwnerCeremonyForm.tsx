@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Ceremony, User } from '../../types';
 import { Card, Input, Button } from '../UIComponents';
+import { CeremonyTypePicker } from '../CeremonyTypePicker';
+import { LocationMapField } from '../LocationMapField';
 import { Loader2, Wand2, Trash2, Image as ImageIcon, Sparkles, ArrowLeft, QrCode } from 'lucide-react';
 import { generateCeremonyBanner, generateInvitationMessage } from '../../services/geminiService';
 
@@ -85,7 +87,11 @@ const OwnerCeremonyForm: React.FC<OwnerCeremonyFormProps> = ({ initialData, onSa
                                 <Input label="កាលបរិច្ឆេទ" type="date" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} required />
                                 <Input label="ថវិកាគ្រោង ($)" type="number" value={formData.budget || ''} onChange={e => setFormData({...formData, budget: Number(e.target.value)})} />
                             </div>
-                            <Input label="ទីតាំង" value={formData.location || ''} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="ផ្ទះលេខ... ផ្លូវ..." />
+                            <LocationMapField
+                                location={formData.location}
+                                mapUrl={formData.mapUrl}
+                                onChange={patch => setFormData({ ...formData, ...patch })}
+                            />
                         </div>
                     </Card>
 
@@ -202,29 +208,10 @@ const OwnerCeremonyForm: React.FC<OwnerCeremonyFormProps> = ({ initialData, onSa
                 {/* Right Column: Sidebar */}
                 <div className="space-y-6">
                     <Card title="ប្រភេទកម្មវិធី">
-                            <div className="grid grid-cols-2 gap-3 mb-3">
-                                {['អាពាហ៍ពិពាហ៍', 'ខួបកំណើត', 'ឡើងផ្ទះ', 'បុណ្យសព', 'បុណ្យ ៧ ថ្ងៃ', 'Other'].map(type => (
-                                    <button
-                                    key={type}
-                                    onClick={() => setFormData({...formData, type: type === 'Other' ? '' : type})}
-                                    className={`px-3 py-3 rounded-xl text-sm font-bold border transition-all ${
-                                        formData.type === type || (type === 'Other' && !['អាពាហ៍ពិពាហ៍', 'ខួបកំណើត', 'ឡើងផ្ទះ', 'បុណ្យសព', 'បុណ្យ ៧ ថ្ងៃ'].includes(formData.type || ''))
-                                        ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-200' 
-                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-                                    }`}
-                                    >
-                                        {type === 'Other' ? 'ផ្សេងៗ...' : type}
-                                    </button>
-                                ))}
-                            </div>
-                            {!['អាពាហ៍ពិពាហ៍', 'ខួបកំណើត', 'ឡើងផ្ទះ', 'បុណ្យសព', 'បុណ្យ ៧ ថ្ងៃ'].includes(formData.type || 'អាពាហ៍ពិពាហ៍') && (
-                                <Input 
-                                placeholder="បញ្ចូលប្រភេទកម្មវិធី..." 
-                                value={formData.type || ''} 
-                                onChange={e => setFormData({...formData, type: e.target.value})}
-                                autoFocus
-                                />
-                            )}
+                        <CeremonyTypePicker
+                            value={formData.type}
+                            onChange={type => setFormData({ ...formData, type })}
+                        />
                     </Card>
 
                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 sticky top-6">

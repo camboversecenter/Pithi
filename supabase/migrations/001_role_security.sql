@@ -141,8 +141,11 @@ create policy "Enable select for everyone"
     using (true);
 
 -- 4. One-time cleanup: demote any non-super-admin who already escalated
---    themselves to ADMIN through the old hole. Comment out if not desired.
-update public.users
-    set role = 'GENERAL_USER'
-    where role = 'ADMIN'
-      and email <> 'pithi.deva@gmail.com';
+--    themselves to ADMIN through the old hole.
+--    DISABLED BY DEFAULT — the production project has a legitimate admin
+--    (sengtha@gmail.com) that this would wrongly demote. Uncomment only if you
+--    specifically want to strip all admins except the super admin.
+-- update public.users
+--     set role = 'GENERAL_USER'
+--     where role = 'ADMIN'
+--       and email <> 'pithi.deva@gmail.com';

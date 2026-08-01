@@ -172,9 +172,20 @@ alter table public.post_bookmarks enable row level security;
 alter table public.post_comments enable row level security;
 
 -- 5. Pin search_path on the older helper functions (linter warnings) --
-alter function public.increment_post_stat(bigint, text) set search_path = public;
-alter function public.decrement_post_stat(bigint, text) set search_path = public;
-alter function public.touch_updated_at() set search_path = public;
+-- Guarded: these helpers may not exist on every database, so only alter the
+-- ones that are actually present (avoids "function ... does not exist").
+do $$
+begin
+    if exists (select 1 from pg_proc where proname = 'increment_post_stat') then
+        execute 'alter function public.increment_post_stat(bigint, text) set search_path = public';
+    end if;
+    if exists (select 1 from pg_proc where proname = 'decrement_post_stat') then
+        execute 'alter function public.decrement_post_stat(bigint, text) set search_path = public';
+    end if;
+    if exists (select 1 from pg_proc where proname = 'touch_updated_at') then
+        execute 'alter function public.touch_updated_at() set search_path = public';
+    end if;
+end $$;
 
 -- 6. (OPTIONAL) Stop the public PITHI bucket from allowing file listing.
 -- Public object URLs keep working without this policy; it only removes the

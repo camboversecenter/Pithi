@@ -342,19 +342,19 @@ alter table public.post_bookmarks enable row level security;
 alter table public.post_comments enable row level security;
 
 -- 5. Pin search_path on the older helper functions (linter warnings) --
--- Guarded: these helpers may not exist on every database, so only alter the
--- ones that are actually present (avoids "function ... does not exist").
+-- Purely cosmetic (silences linter warnings). These helpers may be absent or
+-- have a different signature on some databases, so each ALTER swallows
+-- "undefined_function" and can never block the migration.
 do $$
 begin
-    if exists (select 1 from pg_proc where proname = 'increment_post_stat') then
-        execute 'alter function public.increment_post_stat(bigint, text) set search_path = public';
-    end if;
-    if exists (select 1 from pg_proc where proname = 'decrement_post_stat') then
-        execute 'alter function public.decrement_post_stat(bigint, text) set search_path = public';
-    end if;
-    if exists (select 1 from pg_proc where proname = 'touch_updated_at') then
-        execute 'alter function public.touch_updated_at() set search_path = public';
-    end if;
+    begin execute 'alter function public.increment_post_stat(bigint, text) set search_path = public';
+    exception when undefined_function then null; end;
+
+    begin execute 'alter function public.decrement_post_stat(bigint, text) set search_path = public';
+    exception when undefined_function then null; end;
+
+    begin execute 'alter function public.touch_updated_at() set search_path = public';
+    exception when undefined_function then null; end;
 end $$;
 
 -- 6. (OPTIONAL) Stop the public PITHI bucket from allowing file listing.

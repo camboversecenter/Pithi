@@ -863,6 +863,16 @@ alter table public.bookings add column if not exists "unitPrice" numeric(12, 2);
 alter table public.bookings add column if not exists "bookedByUserName" text;
 alter table public.bookings add column if not exists "providerName" text;
 
+-- The overlap trigger (migration 003) fires on every bookings UPDATE. These
+-- backfills only touch name/price columns, so pause it to avoid tripping on
+-- pre-existing overlapping bookings created before that trigger existed.
+do $$
+begin
+    if exists (select 1 from pg_trigger where tgname = 'trg_enforce_booking_no_overlap' and tgrelid = 'public.bookings'::regclass) then
+        execute 'alter table public.bookings disable trigger trg_enforce_booking_no_overlap';
+    end if;
+end $$;
+
 update public.bookings b
 set "bookedByUserName" = u.name
 from public.users u
@@ -878,6 +888,14 @@ alter table public.booking_comments add column if not exists "attachmentType" te
 
 -- Back-fill the unit price for rows created before quantities existed.
 update public.bookings set "unitPrice" = price where "unitPrice" is null;
+
+-- Re-enable the overlap trigger now that the backfill is finished.
+do $$
+begin
+    if exists (select 1 from pg_trigger where tgname = 'trg_enforce_booking_no_overlap' and tgrelid = 'public.bookings'::regclass) then
+        execute 'alter table public.bookings enable trigger trg_enforce_booking_no_overlap';
+    end if;
+end $$;
 
 do $$
 begin

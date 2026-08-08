@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { getCurrentUser, getUsers, addAdminByEmail, removeAdmin, getAdmins, isSuperAdmin, switchMyRole } from '../services/authService';
+import { getCurrentUser, getUsers, addAdminByEmail, removeAdmin, getAdmins, isSuperAdmin, isSuperAdminEmail, switchMyRole } from '../services/authService';
 import { getSystemStats, getCleanupStats, runCleanup } from '../services/dataService';
 import { User, UserRole } from '../types';
 import { Card, Button, ConfirmationModal, Pagination } from '../components/UIComponents';
@@ -251,11 +251,11 @@ const AdminDashboard = () => {
                                                      <img src={admin.avatarUrl || `https://ui-avatars.com/api/?name=${admin.name}`} className="w-full h-full object-cover" />
                                                 </div>
                                                 {admin.name}
-                                                {admin.email === 'pithi.deva@gmail.com' && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">SUPER</span>}
+                                                {isSuperAdminEmail(admin.email) && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">SUPER</span>}
                                             </td>
                                             <td className="p-3 text-slate-600">{admin.email}</td>
                                             <td className="p-3 text-right">
-                                                {admin.email !== 'pithi.deva@gmail.com' && admin.id !== currentUser.id && (
+                                                {!isSuperAdminEmail(admin.email) && admin.id !== currentUser.id && (
                                                     <button 
                                                         onClick={() => setDeleteAdminId(admin.id)}
                                                         className="text-slate-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-all"

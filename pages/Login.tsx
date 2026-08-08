@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { loginUser } from '../services/authService';
-import { supabase } from '../services/supabaseConfig';
+import { isSupabaseConfigured, supabaseCallbackUrl } from '../services/supabaseConfig';
 import { Logo } from '../components/Logo';
 import {
   BookOpen,
@@ -18,9 +18,7 @@ const Login = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (supabase) {
-        setSupabaseConnected(true);
-    }
+    setSupabaseConnected(isSupabaseConfigured);
   }, []);
 
   useEffect(() => {
@@ -164,9 +162,18 @@ const Login = () => {
                             )}
                         </button>
                     ) : (
-                        <div className="w-full py-3.5 border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 text-sm bg-slate-50">
-                            <Loader2 size={16} className="animate-spin mr-2" />
-                            Connecting to Service...
+                        <div className="w-full p-3.5 border border-dashed border-amber-300 rounded-xl text-xs text-amber-800 bg-amber-50 space-y-1.5 text-left">
+                            <p className="font-bold flex items-center gap-2">
+                                <AlertCircle size={14} className="flex-shrink-0" />
+                                Supabase is not configured
+                            </p>
+                            <p className="leading-relaxed">
+                                Copy <code className="font-mono font-bold">.env.example</code> to{' '}
+                                <code className="font-mono font-bold">.env.local</code>, set{' '}
+                                <code className="font-mono font-bold">VITE_SUPABASE_URL</code> and{' '}
+                                <code className="font-mono font-bold">VITE_SUPABASE_ANON_KEY</code>, then restart
+                                the dev server.
+                            </p>
                         </div>
                     )}
                 </div>
@@ -188,7 +195,7 @@ const Login = () => {
                             <li>បន្ថែមអ៊ីមែលរបស់អ្នកទៅក្នុងបញ្ជី <strong>Test users</strong> បើស្ថិតក្នុងទម្រង់ Testing។</li>
                         </ol>
                         <div className="pt-1.5 border-t text-[10px] text-slate-500 leading-relaxed italic">
-                            *សូមប្រាកដថា Authorized Redirect URI ត្រូវគ្នាជាមួយ Supabase Callback URL: <code className="bg-slate-150 p-0.5 rounded font-mono break-all font-bold">https://tkhdcccgvwpnhqgxhymg.supabase.co/auth/v1/callback</code>
+                            *សូមប្រាកដថា Authorized Redirect URI ត្រូវគ្នាជាមួយ Supabase Callback URL: <code className="bg-slate-150 p-0.5 rounded font-mono break-all font-bold">{supabaseCallbackUrl || 'https://<your-project-ref>.supabase.co/auth/v1/callback'}</code>
                         </div>
                     </div>
                 </details>

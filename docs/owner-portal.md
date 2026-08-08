@@ -62,4 +62,3 @@ Data: the ceremony/guest/invitation/plan functions shared with the Organizer
 Portal, plus `getTransactions`, `addTransaction`, `deleteTransaction`,
 `getPendingReportedTransactions`, `confirmReportedTransaction`,
 `rejectReportedTransaction`. The Budget tab itself makes no AI calls.
-</content>

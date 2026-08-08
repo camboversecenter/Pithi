@@ -59,4 +59,3 @@ Once unlocked, comments load on demand (`getPostComments`) and can be added with
 
 Data: `getSocialPosts`, `createSocialPost`, `reactToPost`, `bookmarkPost`,
 `getPostComments`, `addPostComment`. AI: `moderateSocialPost`.
-</content>

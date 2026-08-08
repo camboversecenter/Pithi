@@ -49,4 +49,3 @@ Notes:
   [Invited Ceremonies](invitations-and-rsvp.md) detail view.
 - Vendor "income" on the dashboard is the sum of `COMPLETED` booking prices
   (rating is a fixed demo value).
-</content>

@@ -1,15 +1,15 @@
 -- ====================================================================
 -- MIGRATION 002 — Production security hardening
 -- ====================================================================
--- Applied to the production project (tkhdcccgvwpnhqgxhymg). Idempotent and
--- non-destructive — safe to run more than once. Running it brings any PITHI
+-- Idempotent and non-destructive — safe to run more than once. Running it brings any PITHI
 -- database to the same secured state:
 --   * get_my_role() helper
 --   * register_profile() reliable registration RPC (authenticated only)
 --   * enforce_user_role_integrity() guard against ADMIN self-promotion
 --   * Row-Level Security enabled + policies on the 4 social tables
 --   * search_path pinned on the older helper functions (linter warnings)
--- Super admin stays pithi.deva@gmail.com; no existing admin is demoted.
+-- No existing admin is demoted. NOTE: migration 006 supersedes the hardcoded
+-- super-admin address used here with a configurable one.
 -- ====================================================================
 
 -- 1. Helper: securely fetch the caller's role (used by RLS policies) --

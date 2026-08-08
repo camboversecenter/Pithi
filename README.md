@@ -7,9 +7,9 @@
 PITHI ("ceremony" in Khmer) is a Progressive Web App for planning and managing
 traditional Cambodian ceremonies - weddings, birthdays, housewarmings, funerals,
 and memorial rites. It connects the people who host and organize events with the
-vendors who service them, in a single Khmer-language marketplace. It works fully
-online against Supabase, and also runs in a self-contained demo mode with no
-backend at all.
+vendors who service them, in a single Khmer-language marketplace. It runs
+against Supabase — Postgres, Auth, Storage and Edge Functions — with no custom
+application server of its own.
 
 ## About the project
 
@@ -79,29 +79,50 @@ services/              authService, dataService, geminiService, supabaseConfig
 supabase/              schema.sql (tables + RLS) and the gemini-proxy Edge Function
 ```
 
-## Local / Demo Mode
-
-The app detects a `pithi_mock_user` in `localStorage` and, when present,
-short-circuits `dataService`, `authService`, and `geminiService` to fully
-simulated data and canned AI responses. AI image generation degrades gracefully
-to procedurally drawn HTML5 Canvas banners in a Khmer decorative style. This
-lets the entire app be demoed without any backend configured.
-
 ## Run Locally
 
-**Prerequisites:** Node.js
+**Prerequisites:** Node.js 18+ and a Supabase project (the free tier is enough).
 
 1. Install dependencies:
    ```bash
    npm install
    ```
-2. Configure Supabase - copy `.env.example` to `.env.local` and set your
-   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. To enable the AI features,
-   set the `GEMINI_API_KEY` secret on the `gemini-proxy` Supabase Edge Function.
-3. Run the app:
+2. **Create the database.** In the Supabase SQL Editor, run
+   `supabase/schema.sql` on a new project, then
+   `supabase/migrations/RUN_ALL.sql`. Both are idempotent and non-destructive.
+3. **Claim the super administrator** (optional but recommended) so your account
+   is promoted to `ADMIN` on first sign-in:
+   ```sql
+   select public.set_super_admin_email('you@example.com');
+   ```
+4. **Configure the app.** Copy `.env.example` to `.env.local` and fill in
+   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and — matching step 3 —
+   `VITE_SUPER_ADMIN_EMAIL`. `.env.local` is git-ignored; never commit real
+   values.
+5. **Enable Google sign-in**, the only supported login method — see
+   [`docs/google-signin-setup.md`](docs/google-signin-setup.md).
+6. Run the app:
    ```bash
    npm run dev
    ```
+
+### Optional: AI features
+
+The Gemini-backed features go through the `gemini-proxy` Supabase Edge Function
+so the API key never reaches the browser. Deploy it and set the secret:
+
+```bash
+supabase functions deploy gemini-proxy
+supabase secrets set GEMINI_API_KEY=your-key
+```
+
+Without it the AI panels stay available but return canned local responses.
+
+### Optional: development test accounts
+
+`supabase/seed_test_users.sql` seeds one password account per non-admin role for
+local development. Read the header first — it is for **dev/staging databases
+only** and refuses to run until you replace its placeholder password.
 
 ## Scripts
 

@@ -96,4 +96,3 @@ calls. It asks for a missing date instead of inventing one.
 To enable real AI, set the `GEMINI_API_KEY` secret on the deployed `gemini-proxy`
 Edge Function. With no key (or in mock mode), every feature still works via the
 fallbacks above.
-</content>

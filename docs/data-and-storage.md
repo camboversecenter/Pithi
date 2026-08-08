@@ -109,4 +109,3 @@ Creates the shared `supabase` client. Note the URL and anon key are currently
 `VITE_SUPABASE_ANON_KEY` variables documented in `.env.example`. The anon key is
 safe to expose (RLS protects the data), but wiring it to env vars would be more
 conventional.
-</content>

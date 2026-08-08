@@ -104,4 +104,3 @@ route guards do **not** enforce role (any logged-in user can hash-navigate to an
 page) — it is RLS that actually prevents unauthorized reads/writes. In mock/demo
 mode none of this applies, because the app is operating entirely on localStorage
 (see [data-and-storage.md](data-and-storage.md)).
-</content>

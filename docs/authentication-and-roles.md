@@ -30,27 +30,24 @@ into `/login`. `Layout` redirects any logged-out visit to a non-public route
 (including `/`) to `/welcome`; logged-in users hitting `/welcome` are bounced to
 the dashboard.
 
-## Sign-in options (`pages/Login.tsx`)
+## Sign-in (`pages/Login.tsx`)
 
-The login screen is deliberately a **public interactive demo** and offers four
-parallel ways in:
+**Google OAuth is the only way in.** `supabase.auth.signInWithOAuth` is called
+with `redirectTo: window.location.origin`, and the Supabase client uses the
+**PKCE flow** so the OAuth result comes back as a `?code=` query param rather
+than a `#access_token` hash fragment (which would collide with the hash
+router). Making Google sign-in work also requires dashboard configuration —
+see [google-signin-setup.md](google-signin-setup.md).
 
-1. **Email sign-in / sign-up** — a tabbed form (`ចូលគណនី` Sign In /
-   `បង្កើតគណនី` Sign Up). Sign-up requires a full name; on success it switches
-   you back to the sign-in tab. Supabase error strings are translated to Khmer
-   (invalid credentials, email already registered, password too short).
-2. **Real Google OAuth** — `supabase.auth.signInWithOAuth` with
-   `redirectTo: window.location.origin`. The Supabase client uses the **PKCE
-   flow** so the OAuth result comes back as a `?code=` query param rather than a
-   `#access_token` hash fragment (which would collide with the hash router).
-   Making real Google sign-in work also requires dashboard configuration —
-   see [google-signin-setup.md](google-signin-setup.md).
-3. **Google "simulator"** — a consent-bypass form (defaulting to the admin
-   identity `pithi.deva@gmail.com`) for demoing the OAuth flow when a real Google
-   project isn't configured. There is also an inline troubleshooting guide for
-   Google's *Error 403: org_internal*.
-4. **Seven one-click test accounts** — one per role, all using password
-   `password123`. These authenticate entirely client-side (see Demo mode below).
+The screen also carries an inline troubleshooting panel for Google's
+*Error 403: org_internal*, which shows the callback URL derived from the
+configured `VITE_SUPABASE_URL`. When Supabase is not configured at all, the
+sign-in button is replaced by setup instructions.
+
+> Earlier versions also offered email/password sign-in, a Google "simulator",
+> and one-click test accounts. All of them have been removed — they are not
+> appropriate for a public deployment. For local development, seed password
+> accounts with `supabase/seed_test_users.sql` (dev databases only).
 
 ## Role selection (`pages/RoleSelection.tsx`)
 
@@ -66,22 +63,26 @@ logs the user back out.
 
 - **`subscribe(listener)`** — `Layout` uses this to react to auth changes.
 - **`getCurrentUser()`** — synchronous in-memory user, used by `PrivateRoute`.
-- **`restoreSession()`** runs on import: a `pithi_mock_user` in localStorage wins
-  over any Supabase session; otherwise it reads the Supabase session and loads
-  the `public.users` profile.
-- **Super-admin auto-promotion**: anyone signing in as `pithi.deva@gmail.com` is
-  auto-created/upgraded to `ADMIN`.
-- **Registration/login helpers**: `loginWithEmailAndPassword`,
-  `registerWithEmailAndPassword`, `simulateGoogleLogin`, `completeRegistration`,
+- **`restoreSession()`** runs on import: it clears any stale `pithi_mock_user`
+  key left by an old build, then reads the Supabase session and loads the
+  matching `public.users` profile.
+- **Super-admin auto-promotion**: the address in `VITE_SUPER_ADMIN_EMAIL` is
+  auto-created/upgraded to `ADMIN` on sign-in. It has **no default** — leave it
+  unset and no account is auto-promoted. The database must agree; see
+  `supabase/migrations/006_configurable_super_admin.sql`.
+- **Registration helpers**: `loginUser`, `completeRegistration`,
   `getPendingUser`, `isRegistrationPending`, `logout`.
 - **Admin management**: `getAdmins`, `addAdminByEmail`, `removeAdmin`,
-  `switchMyRole`, `getUsers`, `getUserById`, `isSuperAdmin`.
+  `switchMyRole`, `getUsers`, `getUserById`, `isSuperAdmin`,
+  `isSuperAdminEmail`.
 
-### localStorage keys used by auth
-- `pithi_mock_user` — the active demo/mock session (a full `User`). Its presence
-  puts the whole app into "local mode".
-- `pithi_local_registered_users` — registry of locally email-registered users
-  (used so the demo works even if Supabase blocks email confirmation).
+### A note on "local mode"
+Several services (`dataService`, `chatService`, `notificationService`,
+`geminiService`, `storageService`) still branch on a `pithi_mock_user`
+localStorage key and fall back to simulated data. **That path is vestigial:**
+nothing writes the key any more, and `restoreSession()` deletes it on startup,
+so the branches are never taken. Treat them as dead code pending removal, not
+as a supported offline mode.
 
 ## Routing & access control (`App.tsx`)
 
@@ -131,15 +132,17 @@ A promise-based modal system replaces native `alert`/`confirm` app-wide:
 icon and button styling; default buttons are Khmer (`យល់ព្រម` OK / `បោះបង់`
 Cancel).
 
-## Demo / local mode (important)
+## Demo / local mode (vestigial)
 
-The app is built to run with **no backend at all**. When a `pithi_mock_user`
-exists in localStorage:
-- All data reads/writes go to localStorage with seeded demo records.
-- Image uploads become base64 data URLs.
-- AI calls return canned local responses.
+The service layer still contains a "local mode" branch: when a `pithi_mock_user`
+exists in localStorage, data reads/writes go to seeded localStorage records,
+image uploads become base64 data URLs, and AI calls return canned responses.
 
-Test accounts and locally-registered users authenticate fully client-side, and
-even a real session falls back to local mode on any Supabase/RLS/network error —
-so the UI never hard-crashes during a demo.
-</content>
+**Nothing enables it any more.** The test accounts and email registration that
+used to write that key are gone, and `restoreSession()` deletes the key on
+startup. Running PITHI now requires a configured Supabase project.
+
+What *does* still apply is the **error fallback**: a real session that hits a
+Supabase/RLS/network error degrades to local data for that call rather than
+hard-crashing the UI. That masks backend misconfiguration — if the app shows
+plausible data that never persists, check the browser console.

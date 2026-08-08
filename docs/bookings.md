@@ -102,4 +102,3 @@ must see (comments, bookings), which surface the error instead of silently
 storing a copy only the sender can read. `resolveBookingTotals` is the single
 place where `unitPrice × quantity` becomes `price`. None of the booking screens
 use AI.
-</content>

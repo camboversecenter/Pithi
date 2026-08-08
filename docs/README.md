@@ -55,7 +55,6 @@ For a quick project overview and setup instructions, see the
 These docs describe the code as it currently stands, including a few things worth
 knowing: route guards enforce "logged in" but not role (data is protected by RLS,
 not routing); the community comment gate is `useful > 100` in code though the UI
-says "100"; the Supabase URL/anon key are hardcoded rather than read from env
-vars; and KHR gifts are converted to USD at a fixed 1:4000 rate. Each is called
-out in the relevant document.
-</content>
+says "100"; KHR gifts are converted to USD at a fixed 1:4000 rate; and the
+"local mode" branches in the service layer are vestigial dead code that nothing
+activates any more. Each is called out in the relevant document.

@@ -104,4 +104,3 @@ responses and canvas-drawn images).
 | Data functions & offline fallback | `data-and-storage.md` |
 | Schema & RLS policies | `database-and-security.md` |
 | PWA / installability / offline | `pwa-and-offline.md` |
-</content>

@@ -44,8 +44,9 @@ Offline resilience comes from two layers working together:
    or Gemini is unreachable — see [data-and-storage.md](data-and-storage.md) and
    [ai-assistant.md](ai-assistant.md).
 
-Together these let the whole app — including sign-in via test accounts, browsing,
-and AI content — run with no backend at all.
+These fallbacks keep the UI responsive when the network drops mid-session. They
+are **not** a supported offline mode: sign-in always requires a reachable
+Supabase project, and data written while degraded is not persisted.
 
 ## Deployment
 
@@ -58,4 +59,3 @@ and AI content — run with no backend at all.
 - **Backend pieces to configure separately:** the Supabase project (schema + RLS
   from `supabase/schema.sql`, the public `PITHI` storage bucket) and the
   `gemini-proxy` Edge Function with its `GEMINI_API_KEY` secret.
-</content>

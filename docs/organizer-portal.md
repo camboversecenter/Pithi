@@ -90,4 +90,3 @@ Data: `getCeremonies`, `getCeremonyById`, `createCeremony`, `updateCeremony`,
 `getInvitationTemplates`, `saveInvitationTemplate`, `deleteInvitationTemplate`.
 AI: `generateCeremonyBanner`, `generateInvitationMessage`, `generateCeremonyPlan`.
 Storage: `uploadImage`, `deleteImage`. Auth: `getUsers`, `getCurrentUser`.
-</content>

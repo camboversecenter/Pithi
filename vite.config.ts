@@ -17,6 +17,7 @@ export default defineConfig(() => {
         manifest: {
           name: 'ពិធី - PITHI Ceremony Planner',
           short_name: 'PITHI',
+          lang: 'km',
           description: 'A comprehensive ceremony management platform connecting organizers, owners, and vendors for seamless event planning.',
           theme_color: '#be123c',
           background_color: '#f8fafc',

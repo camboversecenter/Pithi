@@ -95,4 +95,3 @@ Data: `getPublicInvitation`, `submitPublicRsvp`, `getCeremonyById`,
 `reportTransaction`, `getMyReportedTransactions`. AI: `scanBusinessCard`,
 `scanBankReceipt`. Maps: `resolveMapLink`. Storage:
 `uploadImage(file, 'receipts')`. Auth: `getUserById`, `getCurrentUser`.
-</content>

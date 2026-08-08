@@ -3,8 +3,10 @@
 Route: `/admin` · Role: `ADMIN` (non-admins see `គ្មានសិទ្ធិ។` — "No permission")
 · File: `pages/AdminDashboard.tsx`
 
-The system control panel (`ផ្ទាំងគ្រប់គ្រងប្រព័ន្ធ`). The **super admin**
-(hardcoded email `pithi.deva@gmail.com`) gets extra abilities.
+The system control panel (`ផ្ទាំងគ្រប់គ្រងប្រព័ន្ធ`). The **super admin** — the
+address configured in `VITE_SUPER_ADMIN_EMAIL` — gets extra abilities and cannot
+be demoted. With that variable unset there is no super admin, and every admin is
+an ordinary `ADMIN` granted from this page.
 
 ## System stats
 
@@ -52,4 +54,3 @@ Auth: `getUsers`, `getAdmins`, `addAdminByEmail`, `removeAdmin`, `isSuperAdmin`,
 
 > These cleanup and stats functions call Supabase directly (no localStorage
 > fallback), so the Admin Dashboard is meaningful only against a real backend.
-</content>

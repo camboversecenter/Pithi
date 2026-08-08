@@ -112,4 +112,3 @@ so price can be negotiated before (or instead of) booking.
 `updateService`, `deleteService`, `getBookingsByService`, `getReviews`,
 `addReview`, `createBooking`, `getCeremonies` — all in `dataService.ts` with the
 standard Supabase ⇄ localStorage fallback.
-</content>

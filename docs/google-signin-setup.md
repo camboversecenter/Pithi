@@ -14,8 +14,9 @@ issue — the code cannot fix those for you.
   session is never established. PKCE returns a `?code=…` query param instead,
   which coexists with the hash router.
 - `services/supabaseConfig.ts` reads `VITE_SUPABASE_URL` /
-  `VITE_SUPABASE_ANON_KEY` from the environment (falling back to the demo
-  project).
+  `VITE_SUPABASE_ANON_KEY` from the environment. There is no fallback: if they
+  are unset the login screen shows setup instructions instead of a sign-in
+  button.
 - `pages/Login.tsx` now reads any OAuth error returned on the redirect URL
   (e.g. `access_denied`, `org_internal`) and shows it, instead of bouncing the
   user back to a blank form.
@@ -58,14 +59,14 @@ Create/edit an **OAuth 2.0 Client ID** (type: Web application):
 ## Verifying
 
 1. Deploy (or run locally) with the env vars set.
-2. Open the app, go to **Login → Continue with Google → Use Real OAuth**.
+2. Open the app and go to **Login → ចូលគណនីជាមួយ Google**.
 3. You should be redirected to Google, then back to the app already signed in.
 4. If it fails, the Login page now shows the exact Google/Supabase error message —
    use that to pinpoint which of the steps above is missing.
 
-## Local demo without Google
+## Running without Google
 
-None of this is needed to try PITHI: the login page's **Google Login Simulator**
-and the **one-click test accounts** authenticate entirely client-side (see
-[authentication-and-roles.md](authentication-and-roles.md)).
-</content>
+There is no way around it in a deployed app — Google OAuth is the only sign-in
+method. For local development you can seed password accounts into a **dev**
+Supabase project with `supabase/seed_test_users.sql` and sign in through the
+Supabase dashboard; see [authentication-and-roles.md](authentication-and-roles.md).

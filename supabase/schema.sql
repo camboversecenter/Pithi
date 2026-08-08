@@ -405,6 +405,68 @@ create policy "Allow admin delete profiles"
     using (public.get_my_role() = 'ADMIN');
 
 -- --------------------------------------------------------------------
+-- DEPLOYMENT SETTINGS (super administrator)
+-- --------------------------------------------------------------------
+-- The super administrator is identified by verified OAuth email. That address
+-- is deployment-specific, so it lives in a settings table rather than being
+-- hardcoded here — otherwise every deployment of this schema would inherit an
+-- administrator it did not choose.
+--
+-- After applying this schema, set your own address:
+--     select public.set_super_admin_email('you@example.com');
+-- and put the same value in VITE_SUPER_ADMIN_EMAIL (see .env.example).
+--
+-- Until it is set there is no super administrator: no account is auto-promoted
+-- on sign-in. Admins can still be granted from the Admin dashboard.
+-- --------------------------------------------------------------------
+create table if not exists public.app_settings (
+    key   text primary key,
+    value text
+);
+
+-- Locked down: unreachable through the public API. Values are read only via
+-- the SECURITY DEFINER helpers below, which run as the table owner. RLS is on
+-- with no policies on purpose, so any query issued through the API sees zero
+-- rows even if a GRANT is restored by mistake.
+alter table public.app_settings enable row level security;
+revoke all on table public.app_settings from anon, authenticated;
+
+create or replace function public.super_admin_email()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select nullif(lower(trim(value)), '')
+    from public.app_settings
+    where key = 'super_admin_email';
+$$;
+
+revoke execute on function public.super_admin_email() from public, anon;
+grant execute on function public.super_admin_email() to authenticated;
+
+create or replace function public.set_super_admin_email(p_email text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_email text := nullif(lower(trim(p_email)), '');
+begin
+    insert into public.app_settings (key, value)
+    values ('super_admin_email', v_email)
+    on conflict (key) do update set value = excluded.value;
+
+    return v_email;
+end;
+$$;
+
+-- Never callable from the browser: changing this address is a privilege grant.
+revoke execute on function public.set_super_admin_email(text) from public, anon, authenticated;
+
+-- --------------------------------------------------------------------
 -- ROLE INTEGRITY GUARD
 -- --------------------------------------------------------------------
 -- The self-update policy above lets users edit their own profile (name,
@@ -422,6 +484,7 @@ as $$
 declare
     actor_role text;
     actor_email text;
+    super_email text;
     is_privileged boolean;
 begin
     -- Trusted direct-database / service-role contexts have no end-user JWT.
@@ -431,9 +494,11 @@ begin
         return new;
     end if;
 
-    actor_email := auth.jwt() ->> 'email';
+    actor_email := lower(trim(auth.jwt() ->> 'email'));
+    super_email := public.super_admin_email();
     select role into actor_role from public.users where id = auth.uid();
-    is_privileged := (actor_role = 'ADMIN') or (actor_email = 'pithi.deva@gmail.com');
+    is_privileged := (actor_role = 'ADMIN')
+                  or (super_email is not null and actor_email = super_email);
 
     if tg_op = 'INSERT' then
         if new.role = 'ADMIN' and not is_privileged then
@@ -479,13 +544,14 @@ declare
     );
     v_avatar text := auth.jwt() -> 'user_metadata' ->> 'avatar_url';
     v_role text := p_role;
+    v_super_email text := public.super_admin_email();
     v_result public.users;
 begin
     if v_id is null then
         raise exception 'Not authenticated';
     end if;
 
-    if v_email = 'pithi.deva@gmail.com' then
+    if v_super_email is not null and lower(trim(v_email)) = v_super_email then
         v_role := 'ADMIN';
     elsif v_role not in ('GENERAL_USER','ORGANIZER','CHEF','HALL','MUSIC_BAND','BEAUTY_SALON') then
         raise exception 'Invalid role %', p_role;
@@ -949,14 +1015,17 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
+set search_path = public
 as $$
+declare
+    super_email text := public.super_admin_email();
 begin
     -- Only auto-provision the super administrator. Every other new user is left
     -- without a profile so the app shows the Role Selection screen, and their
     -- profile is created with the role they choose (via completeRegistration).
     -- Auto-inserting everyone as GENERAL_USER here would silently bypass role
     -- selection and lock all new accounts to GENERAL_USER.
-    if new.email = 'pithi.deva@gmail.com' then
+    if super_email is not null and lower(trim(new.email)) = super_email then
         insert into public.users (id, name, email, role, "avatarUrl")
         values (
             new.id,

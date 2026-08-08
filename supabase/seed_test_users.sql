@@ -1,85 +1,69 @@
 -- ====================================================================
--- PITHI - TEST LOGIN CREDENTIALS DATABASE SEED SCRIPT
+-- PITHI - DEVELOPMENT TEST ACCOUNTS SEED SCRIPT
 -- ====================================================================
--- This script creates standard test accounts for ALL roles in Pithi.
--- Best executed directly in the Supabase SQL Editor.
 --
--- Supported Roles to seed:
---   1. ADMIN         - Admin account (pithi.deva@gmail.com / admin@pithi.com)
---   2. ORGANIZER     - Wedding/event organizer (organizer@pithi.com)
---   3. GENERAL_USER  - Standard customer/owner (client@pithi.com)
---   4. CHEF         - Catering service provider (chef@pithi.com)
---   5. HALL          - Reception venue host (hall@pithi.com)
---   6. MUSIC_BAND    - Music & entertainment band (music@pithi.com)
---   7. BEAUTY_SALON  - Salon & styling vendor (beauty@pithi.com)
+--   ####################################################################
+--   #  DEVELOPMENT AND STAGING ONLY. NEVER RUN THIS ON PRODUCTION.     #
+--   #                                                                  #
+--   #  It creates password-login accounts with a single shared         #
+--   #  password. Anyone who knows an address below can sign in as      #
+--   #  that role. Production uses Google OAuth only.                   #
+--   ####################################################################
 --
--- Password for all test users: password123
+-- Creates one test account per non-admin role:
+--   ORGANIZER     - Wedding/event organizer (organizer@pithi.com)
+--   GENERAL_USER  - Standard customer/owner (client@pithi.com)
+--   CHEF          - Catering service provider (chef@pithi.com)
+--   HALL          - Reception venue host (hall@pithi.com)
+--   MUSIC_BAND    - Music & entertainment band (music@pithi.com)
+--   BEAUTY_SALON  - Salon & styling vendor (beauty@pithi.com)
+--
+-- No ADMIN account is seeded on purpose — a preset administrator with a
+-- shared password is a backdoor. To get an admin on a dev database, sign in
+-- normally and then promote yourself from the SQL editor:
+--
+--   update public.users set role = 'ADMIN' where email = 'you@example.com';
+--
+-- HOW TO RUN
+--   1. Replace CHANGE_ME below with a throwaway password (12+ characters).
+--   2. Run the whole file in the Supabase SQL Editor of a DEV project.
+-- The script refuses to run while the placeholder is still in place.
 -- ====================================================================
 
 -- Enable the pgcrypto extension to support password hashing
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- --------------------------------------------------------------------
+-- 0. SEED PASSWORD — replace CHANGE_ME, then run.
+-- --------------------------------------------------------------------
+select set_config('pithi.seed_password', 'CHANGE_ME', false);
+
+DO $$
+DECLARE
+    v_password text := current_setting('pithi.seed_password', true);
+BEGIN
+    IF v_password IS NULL OR v_password = 'CHANGE_ME' THEN
+        RAISE EXCEPTION
+            'Refusing to seed: replace CHANGE_ME at the top of this file with a throwaway password first.';
+    END IF;
+
+    IF length(v_password) < 12 THEN
+        RAISE EXCEPTION
+            'Refusing to seed: the seed password must be at least 12 characters (got %).', length(v_password);
+    END IF;
+END $$;
+
 -- 1. CLEANUP PREVIOUS TEST USER RECORDS (Optional - run if you want a clean state)
 -- delete from public.users where email in (
---   'pithi.deva@gmail.com', 'admin@pithi.com', 'organizer@pithi.com', 
---   'client@pithi.com', 'chef@pithi.com', 'hall@pithi.com', 
---   'music@pithi.com', 'beauty@pithi.com'
+--   'organizer@pithi.com', 'client@pithi.com', 'chef@pithi.com',
+--   'hall@pithi.com', 'music@pithi.com', 'beauty@pithi.com'
 -- );
 
 -- 2. SEED AUTHENTICATION CREDENTIALS & METADATA INTO auth.users AND public.users
 
--- --------------------------------------------------------------------
--- A. SUPER ADMIN / OWNER (pithi.deva@gmail.com)
--- --------------------------------------------------------------------
-DO $$
-DECLARE
-    new_user_id uuid := 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e501'; -- Hardcoded unique UUID for easy reference
-BEGIN
-    -- Only insert into auth.users if they don't already exist
-    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'pithi.deva@gmail.com') THEN
-        INSERT INTO auth.users (
-            id,
-            aud,
-            role,
-            email,
-            encrypted_password,
-            email_confirmed_at,
-            raw_app_meta_data,
-            raw_user_meta_data,
-            created_at,
-            updated_at
-        ) VALUES (
-            new_user_id,
-            'authenticated',
-            'authenticated',
-            'pithi.deva@gmail.com',
-            crypt('password123', gen_salt('bf')),
-            now(),
-            '{"provider": "email", "providers": ["email"]}'::jsonb,
-            '{"full_name": "Pithi Deva", "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=Admin"}'::jsonb,
-            now(),
-            now()
-        );
-    ELSE
-        SELECT id INTO new_user_id FROM auth.users WHERE email = 'pithi.deva@gmail.com';
-    END IF;
-
-    -- Ensure public profile matches with proper ADMIN role
-    INSERT INTO public.users (id, name, email, role, "avatarUrl")
-    VALUES (
-        new_user_id,
-        'Pithi Deva (Admin)',
-        'pithi.deva@gmail.com',
-        'ADMIN',
-        'https://api.dicebear.com/7.x/adventurer/svg?seed=Admin'
-    )
-    ON CONFLICT (id) DO UPDATE 
-    SET role = 'ADMIN', name = 'Pithi Deva (Admin)';
-END $$;
-
 
 -- --------------------------------------------------------------------
--- B. ORGANIZER (organizer@pithi.com)
+-- A. ORGANIZER (organizer@pithi.com)
 -- --------------------------------------------------------------------
 DO $$
 DECLARE
@@ -91,7 +75,7 @@ BEGIN
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at
         ) VALUES (
             new_user_id, 'authenticated', 'authenticated', 'organizer@pithi.com',
-            crypt('password123', gen_salt('bf')), now(),
+            crypt(current_setting('pithi.seed_password'), gen_salt('bf')), now(),
             '{"provider": "email", "providers": ["email"]}'::jsonb,
             '{"full_name": "Dararoth Wedding Planner"}'::jsonb,
             now(), now()
@@ -113,7 +97,7 @@ END $$;
 
 
 -- --------------------------------------------------------------------
--- C. GENERAL_USER / CLIENT / CEREMONY OWNER (client@pithi.com)
+-- B. GENERAL_USER / CLIENT / CEREMONY OWNER (client@pithi.com)
 -- --------------------------------------------------------------------
 DO $$
 DECLARE
@@ -125,7 +109,7 @@ BEGIN
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at
         ) VALUES (
             new_user_id, 'authenticated', 'authenticated', 'client@pithi.com',
-            crypt('password123', gen_salt('bf')), now(),
+            crypt(current_setting('pithi.seed_password'), gen_salt('bf')), now(),
             '{"provider": "email", "providers": ["email"]}'::jsonb,
             '{"full_name": "Sophea & Chantrea"}'::jsonb,
             now(), now()
@@ -147,7 +131,7 @@ END $$;
 
 
 -- --------------------------------------------------------------------
--- D. CHEF / CATERER (chef@pithi.com)
+-- C. CHEF / CATERER (chef@pithi.com)
 -- --------------------------------------------------------------------
 DO $$
 DECLARE
@@ -159,7 +143,7 @@ BEGIN
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at
         ) VALUES (
             new_user_id, 'authenticated', 'authenticated', 'chef@pithi.com',
-            crypt('password123', gen_salt('bf')), now(),
+            crypt(current_setting('pithi.seed_password'), gen_salt('bf')), now(),
             '{"provider": "email", "providers": ["email"]}'::jsonb,
             '{"full_name": "Meng Catering Chef"}'::jsonb,
             now(), now()
@@ -181,7 +165,7 @@ END $$;
 
 
 -- --------------------------------------------------------------------
--- E. HALL / VENUE PROVIDER (hall@pithi.com)
+-- D. HALL / VENUE PROVIDER (hall@pithi.com)
 -- --------------------------------------------------------------------
 DO $$
 DECLARE
@@ -193,7 +177,7 @@ BEGIN
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at
         ) VALUES (
             new_user_id, 'authenticated', 'authenticated', 'hall@pithi.com',
-            crypt('password123', gen_salt('bf')), now(),
+            crypt(current_setting('pithi.seed_password'), gen_salt('bf')), now(),
             '{"provider": "email", "providers": ["email"]}'::jsonb,
             '{"full_name": "Phnom Penh Palace Hall"}'::jsonb,
             now(), now()
@@ -215,7 +199,7 @@ END $$;
 
 
 -- --------------------------------------------------------------------
--- F. MUSIC_BAND / LIVE MUSIC (music@pithi.com)
+-- E. MUSIC_BAND / LIVE MUSIC (music@pithi.com)
 -- --------------------------------------------------------------------
 DO $$
 DECLARE
@@ -227,7 +211,7 @@ BEGIN
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at
         ) VALUES (
             new_user_id, 'authenticated', 'authenticated', 'music@pithi.com',
-            crypt('password123', gen_salt('bf')), now(),
+            crypt(current_setting('pithi.seed_password'), gen_salt('bf')), now(),
             '{"provider": "email", "providers": ["email"]}'::jsonb,
             '{"full_name": "Pleng Khmer Traditional Band"}'::jsonb,
             now(), now()
@@ -249,7 +233,7 @@ END $$;
 
 
 -- --------------------------------------------------------------------
--- G. BEAUTY_SALON / MAKEUP & COSTUME (beauty@pithi.com)
+-- F. BEAUTY_SALON / MAKEUP & COSTUME (beauty@pithi.com)
 -- --------------------------------------------------------------------
 DO $$
 DECLARE
@@ -261,7 +245,7 @@ BEGIN
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at
         ) VALUES (
             new_user_id, 'authenticated', 'authenticated', 'beauty@pithi.com',
-            crypt('password123', gen_salt('bf')), now(),
+            crypt(current_setting('pithi.seed_password'), gen_salt('bf')), now(),
             '{"provider": "email", "providers": ["email"]}'::jsonb,
             '{"full_name": "Sovannaphumi Beauty Salon"}'::jsonb,
             now(), now()

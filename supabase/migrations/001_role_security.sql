@@ -13,6 +13,10 @@
 --      new user as GENERAL_USER, silently bypassing the in-app Role Selection
 --      screen. It now auto-provisions only the super administrator; everyone
 --      else picks their role in the app.
+--
+-- NOTE: the super-administrator address is hardcoded below. Migration 006
+-- supersedes this with a configurable setting — apply it as well, or just
+-- run RUN_ALL.sql which includes it.
 -- ====================================================================
 
 -- 1. Role integrity guard --------------------------------------------
@@ -142,8 +146,8 @@ create policy "Enable select for everyone"
 
 -- 4. One-time cleanup: demote any non-super-admin who already escalated
 --    themselves to ADMIN through the old hole.
---    DISABLED BY DEFAULT — the production project has a legitimate admin
---    (sengtha@gmail.com) that this would wrongly demote. Uncomment only if you
+--    DISABLED BY DEFAULT — a deployment may have additional legitimate
+--    administrators that this would wrongly demote. Uncomment only if you
 --    specifically want to strip all admins except the super admin.
 -- update public.users
 --     set role = 'GENERAL_USER'

@@ -7,7 +7,27 @@ let pendingRegistrationUser: Partial<User> | null = null;
 let isAuthInitialized = false;
 let authListeners: ((user: User | null) => void)[] = [];
 
-const ADMIN_EMAIL = 'pithi.deva@gmail.com';
+/**
+ * Address of the deployment's super administrator, configured via
+ * `VITE_SUPER_ADMIN_EMAIL` (see `.env.example`). A verified Google account with
+ * this address is auto-provisioned as ADMIN on first sign-in and can never be
+ * demoted from the admin list.
+ *
+ * Deliberately has no default: hardcoding one would silently hand every fork of
+ * this repository an administrator it did not choose. When unset, no account is
+ * auto-promoted and admins are managed entirely from the Admin dashboard.
+ *
+ * Must match the value configured in the database — see
+ * `supabase/migrations/006_configurable_super_admin.sql`.
+ */
+export const SUPER_ADMIN_EMAIL: string =
+    (((import.meta as any).env)?.VITE_SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+
+const ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
+
+/** True when `email` is the configured super administrator. */
+export const isSuperAdminEmail = (email?: string | null): boolean =>
+    !!ADMIN_EMAIL && !!email && email.trim().toLowerCase() === ADMIN_EMAIL;
 
 // Subscribe to auth changes
 export const subscribe = (listener: (user: User | null) => void) => {
@@ -63,7 +83,7 @@ const handleSupabaseUser = async (authUser: any) => {
             .single();
 
         // --- SUPER ADMIN AUTO-PROMOTION & ENFORCEMENT ---
-        if (authUser.email === ADMIN_EMAIL) {
+        if (isSuperAdminEmail(authUser.email)) {
             if (!data) {
                 // Case 1: First time login, create the admin profile
                 const newAdmin: User = {
@@ -119,7 +139,7 @@ export const getCurrentUser = (): User | null => {
 };
 
 export const isSuperAdmin = (): boolean => {
-    return currentUser?.email === ADMIN_EMAIL;
+    return isSuperAdminEmail(currentUser?.email);
 };
 
 export const switchMyRole = async (newRole: UserRole): Promise<void> => {

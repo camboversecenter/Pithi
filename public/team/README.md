@@ -1,14 +1,16 @@
 # Team photos
 
-Drop each team member's photo here with these exact file names. Square images
-(e.g. 600×600) look best; they are cropped from the top. If a photo is missing,
-the About page shows the member's initials instead, so nothing looks broken.
+Drop each team member's photo here named `member-1`, `member-2`, ... `member-6`.
 
-- member-1.jpg
-- member-2.jpg
-- member-3.jpg
-- member-4.jpg
-- member-5.jpg
-- member-6.jpg
+- Extension may be **.jpg**, **.jpeg** or **.png** (each is tried in turn).
+- Square images look best, e.g. 600x600. They are cropped from the top.
+- If a photo is missing, the About page shows the member's initials instead,
+  so nothing looks broken.
+- iPhone photos are usually **.HEIC** - export/convert them to JPG first,
+  browsers cannot display HEIC.
 
-To change a name or role, edit `pages/AboutUs.tsx` (the `team` array).
+Examples: `member-1.jpg`, `member-2.png`
+
+To change a name or role, edit the `team` array in `pages/AboutUs.tsx`.
+Note: `ABOUT.md` on GitHub cannot try multiple extensions - it points at
+`.jpg`, so update the paths there if you upload PNGs.

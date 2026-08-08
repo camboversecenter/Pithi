@@ -16,18 +16,21 @@ import {
 
 // ---------------------------------------------------------------------------
 // TEAM
-// Photos live in /public/team/. Drop each member's photo there using the file
-// name below (square images look best, e.g. 600×600). If a photo is missing,
-// the card shows the member's initials instead — so the page never looks broken.
+// Photos live in /public/team/. Drop each member's photo there named
+// member-1, member-2, ... Square images look best (e.g. 600x600).
+// The extension may be .jpg, .jpeg or .png - each is tried in turn, and if none
+// is found the card shows the member's initials, so the page never looks broken.
 // Edit the name / role fields freely.
 // ---------------------------------------------------------------------------
+const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png'];
+
 const team = [
-  { name: 'Team Member 1', role: 'Founder & CEO', photo: '/team/member-1.jpg', color: 'from-rose-500 to-pink-600' },
-  { name: 'Team Member 2', role: 'Co-Founder', photo: '/team/member-2.jpg', color: 'from-blue-500 to-indigo-600' },
-  { name: 'Team Member 3', role: 'Lead Developer', photo: '/team/member-3.jpg', color: 'from-emerald-500 to-teal-600' },
-  { name: 'Team Member 4', role: 'Backend Developer', photo: '/team/member-4.jpg', color: 'from-amber-500 to-orange-600' },
-  { name: 'Team Member 5', role: 'UI/UX Designer', photo: '/team/member-5.jpg', color: 'from-violet-500 to-purple-600' },
-  { name: 'Team Member 6', role: 'Marketing & Partnerships', photo: '/team/member-6.jpg', color: 'from-cyan-500 to-sky-600' },
+  { name: 'Team Member 1', role: 'Founder & CEO', photo: '/team/member-1', color: 'from-rose-500 to-pink-600' },
+  { name: 'Team Member 2', role: 'Co-Founder', photo: '/team/member-2', color: 'from-blue-500 to-indigo-600' },
+  { name: 'Team Member 3', role: 'Lead Developer', photo: '/team/member-3', color: 'from-emerald-500 to-teal-600' },
+  { name: 'Team Member 4', role: 'Backend Developer', photo: '/team/member-4', color: 'from-amber-500 to-orange-600' },
+  { name: 'Team Member 5', role: 'UI/UX Designer', photo: '/team/member-5', color: 'from-violet-500 to-purple-600' },
+  { name: 'Team Member 6', role: 'Marketing & Partnerships', photo: '/team/member-6', color: 'from-cyan-500 to-sky-600' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -35,41 +38,55 @@ const team = [
 // Logos live in /public/partners/. Drop each logo there using the file name
 // below; a text placeholder shows until the image is added.
 // ---------------------------------------------------------------------------
+const LOGO_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp'];
+
 const partners = [
   {
     name: 'National University of Management',
     sub: 'Academic partner',
     url: 'https://numuniversity.com/',
-    logo: '/partners/num.png',
+    logo: '/partners/num',
   },
   {
     name: 'e-Khmer',
     sub: 'Technology partner',
     url: 'https://www.e-khmer.com/en',
-    logo: '/partners/e-khmer.png',
+    logo: '/partners/e-khmer',
   },
 ];
 
 const incubator = {
-  name: 'Camboverse',
+  name: 'CamboVerse',
   sub: 'Incubated by',
   url: 'https://camboverse.world/',
-  logo: '/partners/camboverse.png',
+  logo: '/partners/camboverse',
 };
 
 const initialsOf = (name: string) =>
   name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
+/**
+ * Tries `base.ext` for each extension in turn. `src` is null once every
+ * candidate has failed, which is the caller's cue to render a fallback.
+ * This means a photo works whether it was saved as .jpg, .jpeg or .png.
+ */
+const useImageWithFallbacks = (base: string, extensions: string[]) => {
+  const [index, setIndex] = useState(0);
+  const src = index < extensions.length ? `${base}.${extensions[index]}` : null;
+  return { src, onError: () => setIndex(i => i + 1) };
+};
+
 const TeamCard = ({ member }: { member: typeof team[number] }) => {
-  const [imgOk, setImgOk] = useState(true);
+  const { src, onError } = useImageWithFallbacks(member.photo, PHOTO_EXTENSIONS);
   return (
     <div className="group bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
       <div className="aspect-square bg-slate-100 overflow-hidden">
-        {imgOk ? (
+        {src ? (
           <img
-            src={member.photo}
+            key={src}
+            src={src}
             alt={member.name}
-            onError={() => setImgOk(false)}
+            onError={onError}
             className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
@@ -89,7 +106,7 @@ const TeamCard = ({ member }: { member: typeof team[number] }) => {
 const PartnerCard = ({
   name, sub, url, logo, icon: Icon,
 }: { name: string; sub: string; url: string; logo: string; icon: any }) => {
-  const [imgOk, setImgOk] = useState(true);
+  const { src, onError } = useImageWithFallbacks(logo, LOGO_EXTENSIONS);
   return (
     <a
       href={url}
@@ -98,8 +115,8 @@ const PartnerCard = ({
       className="group flex items-center gap-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
     >
       <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-        {imgOk ? (
-          <img src={logo} alt={name} onError={() => setImgOk(false)} className="w-full h-full object-contain p-1.5" />
+        {src ? (
+          <img key={src} src={src} alt={name} onError={onError} className="w-full h-full object-contain p-1.5" />
         ) : (
           <Icon size={26} className="text-slate-400" />
         )}
@@ -242,12 +259,13 @@ const AboutUs = () => {
 };
 
 const IncubatorLogo = () => {
-  const [imgOk, setImgOk] = useState(true);
-  return imgOk ? (
+  const { src, onError } = useImageWithFallbacks(incubator.logo, LOGO_EXTENSIONS);
+  return src ? (
     <img
-      src={incubator.logo}
+      key={src}
+      src={src}
       alt={incubator.name}
-      onError={() => setImgOk(false)}
+      onError={onError}
       className="h-16 w-auto max-w-[220px] object-contain bg-white/95 rounded-xl p-2"
     />
   ) : (

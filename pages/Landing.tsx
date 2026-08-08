@@ -82,6 +82,12 @@ const Landing = () => {
           <Logo variant="full" size="sm" />
           <div className="flex items-center gap-2">
             <Link
+              to="/about"
+              className="hidden sm:inline-flex items-center text-sm font-semibold text-slate-500 hover:text-slate-800 px-3 py-2 rounded-lg transition-colors"
+            >
+              អំពីយើង
+            </Link>
+            <Link
               to="/guide"
               className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 px-3 py-2 rounded-lg transition-colors"
             >
@@ -214,6 +220,7 @@ const Landing = () => {
         <div className="max-w-6xl mx-auto px-5 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <Logo variant="full" size="sm" />
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+            <Link to="/about" className="text-slate-500 hover:text-slate-800 font-medium">អំពីយើង</Link>
             <Link to="/guide" className="text-slate-500 hover:text-slate-800 font-medium">សៀវភៅណែនាំ</Link>
             <Link to="/login" className="text-slate-500 hover:text-slate-800 font-medium">ចូលគណនី</Link>
             <a

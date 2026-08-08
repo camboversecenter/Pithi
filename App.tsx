@@ -27,6 +27,7 @@ const UserGuide = lazy(() => import('./pages/UserGuide'));
 const SocialFeed = lazy(() => import('./pages/SocialFeed'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Messages = lazy(() => import('./pages/Messages'));
+const AboutUs = lazy(() => import('./pages/AboutUs'));
 
 // Icons
 import { LayoutDashboard, Search, Calendar, LogOut, Wallet, List, ShieldCheck, BookOpen, Loader2, Home, Briefcase, MessageSquare, Send, Bell, MessagesSquare } from 'lucide-react';
@@ -251,7 +252,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 
     if (!user && isRegistrationPending()) return location.pathname !== '/select-role' ? <Navigate to="/select-role" /> : <>{children}</>;
     
-    const publicPaths = ['/welcome', '/login', '/guide'];
+    const publicPaths = ['/welcome', '/login', '/guide', '/about'];
     const isInvitation = location.pathname.startsWith('/invitation/');
     if (!user) return (!publicPaths.includes(location.pathname) && !isInvitation) ? <Navigate to="/welcome" /> : <>{children}</>;
 
@@ -302,6 +303,7 @@ const App = () => {
             <Route path="/select-role" element={<Layout><RoleSelection /></Layout>} />
             <Route path="/invitation/:id" element={<Layout><InvitationCard /></Layout>} />
             <Route path="/guide" element={<Layout><UserGuide /></Layout>} />
+            <Route path="/about" element={<Layout><AboutUs /></Layout>} />
             <Route path="/" element={<Layout><PrivateRoute><Dashboard /></PrivateRoute></Layout>} />
             <Route path="/community" element={<Layout><PrivateRoute><SocialFeed /></PrivateRoute></Layout>} />
             <Route path="/notifications" element={<Layout><PrivateRoute><Notifications /></PrivateRoute></Layout>} />

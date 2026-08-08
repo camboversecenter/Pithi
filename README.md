@@ -21,6 +21,9 @@ for release as **open source** (see [License](#license)).
 PITHI is **incubated by CamboVerse, at the National University of Management
 (NUM)**, Cambodia.
 
+👉 Meet the team, our partners, and our incubator on the
+**[About page](ABOUT.md)**.
+
 ## Features
 
 - **Role-based portals** - seven roles each get a tailored experience:
@@ -153,4 +156,6 @@ PITHI is incubated by **CamboVerse**, the innovation/startup community at the
 **National University of Management (NUM)**, Cambodia. We thank CamboVerse, NUM,
 and every contributor, supporter, and donor who helps keep PITHI free for the
 community.
+
+See **[ABOUT.md](ABOUT.md)** for the full team, partners, and incubator page.
 

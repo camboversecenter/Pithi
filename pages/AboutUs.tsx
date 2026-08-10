@@ -8,10 +8,8 @@ import {
   Heart,
   Users,
   Sparkles,
-  GraduationCap,
-  Rocket,
-  Handshake,
-  ExternalLink,
+  Building2,
+  Globe,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -34,33 +32,41 @@ const team = [
 ];
 
 // ---------------------------------------------------------------------------
-// PARTNERS & INCUBATOR
-// Logos live in /public/partners/. Drop each logo there using the file name
-// below; a text placeholder shows until the image is added.
+// PARTNERS & SUPPORTERS
+// Logos live in /public/partners/. Drop each logo there using the base name
+// below with any of LOGO_EXTENSIONS; a placeholder icon shows until then.
 // ---------------------------------------------------------------------------
 const LOGO_EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp'];
 
 const partners = [
   {
     name: 'National University of Management',
-    sub: 'Academic partner',
+    roleKm: 'សាកលវិទ្យាល័យម្ចាស់ផ្ទះ',
+    roleEn: 'HOST UNIVERSITY',
+    desc: 'PITHI is hosted at the National University of Management in Phnom Penh.',
+    site: 'numuniversity.com',
     url: 'https://numuniversity.com/',
     logo: '/partners/num',
   },
   {
-    name: 'e-Khmer',
-    sub: 'Technology partner',
+    name: 'CamboVerse Center',
+    roleKm: 'អ្នកបណ្ដុះបណ្ដាលគម្រោង',
+    roleEn: 'INCUBATOR',
+    desc: 'PITHI is incubated by the CamboVerse Center at NUM, which supports Cambodian technology projects.',
+    site: 'camboverse.world',
+    url: 'https://camboverse.world/',
+    logo: '/partners/camboverse',
+  },
+  {
+    name: 'E-KHMER Technology Co., Ltd.',
+    roleKm: 'ដៃគូបច្ចេកវិទ្យា',
+    roleEn: 'TECHNOLOGY PARTNER',
+    desc: 'E-KHMER contributes engineering and technical support to the platform.',
+    site: 'e-khmer.com',
     url: 'https://www.e-khmer.com/en',
     logo: '/partners/e-khmer',
   },
 ];
-
-const incubator = {
-  name: 'CamboVerse',
-  sub: 'Incubated by',
-  url: 'https://camboverse.world/',
-  logo: '/partners/camboverse',
-};
 
 const initialsOf = (name: string) =>
   name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -103,29 +109,41 @@ const TeamCard = ({ member }: { member: typeof team[number] }) => {
   );
 };
 
-const PartnerCard = ({
-  name, sub, url, logo, icon: Icon,
-}: { name: string; sub: string; url: string; logo: string; icon: any }) => {
-  const { src, onError } = useImageWithFallbacks(logo, LOGO_EXTENSIONS);
+const PartnerCard = ({ partner }: { partner: typeof partners[number] }) => {
+  const { src, onError } = useImageWithFallbacks(partner.logo, LOGO_EXTENSIONS);
   return (
     <a
-      href={url}
+      href={partner.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-center gap-4 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-rose-200 transition-all"
+      className="group flex flex-col items-center text-center bg-white rounded-3xl border border-slate-100 p-8 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
     >
-      <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+      {/* Logo */}
+      <div className="h-24 flex items-center justify-center mb-6">
         {src ? (
-          <img key={src} src={src} alt={name} onError={onError} className="w-full h-full object-contain p-1.5" />
+          <img
+            key={src}
+            src={src}
+            alt={partner.name}
+            onError={onError}
+            className="max-h-24 max-w-[200px] w-auto object-contain"
+          />
         ) : (
-          <Icon size={26} className="text-slate-400" />
+          <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+            <Building2 size={30} className="text-slate-300" />
+          </div>
         )}
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{sub}</p>
-        <h3 className="font-bold text-slate-900 leading-snug group-hover:text-rose-700 transition-colors">{name}</h3>
-      </div>
-      <ExternalLink size={16} className="ml-auto text-slate-300 group-hover:text-rose-500 transition-colors flex-shrink-0" />
+
+      <h3 className="font-bold text-slate-900 text-lg leading-snug">{partner.name}</h3>
+      <p className="text-sm font-bold text-emerald-700 mt-1.5">
+        {partner.roleKm} <span className="whitespace-nowrap">({partner.roleEn})</span>
+      </p>
+      <p className="text-sm text-slate-500 leading-relaxed mt-4">{partner.desc}</p>
+
+      <span className="inline-flex items-center gap-1.5 mt-6 text-sm font-bold text-slate-400 group-hover:text-rose-600 transition-colors">
+        <Globe size={15} /> {partner.site}
+      </span>
     </a>
   );
 };
@@ -198,44 +216,19 @@ const AboutUs = () => {
         </div>
       </section>
 
-      {/* Partners */}
-      <section className="max-w-5xl mx-auto px-5 py-12">
-        <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500">
-            <Handshake size={15} className="text-rose-600" /> ដៃគូ · Partners
-          </span>
-          <h2 className="text-2xl font-bold text-slate-900 font-serif mt-2">ភាពជាដៃគូ</h2>
-          <p className="text-slate-500 mt-2 text-sm">PITHI សហការជាមួយស្ថាប័នអប់រំ និងបច្ចេកវិទ្យាឈានមុខ។</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <PartnerCard {...partners[0]} icon={GraduationCap} />
-          <PartnerCard {...partners[1]} icon={Sparkles} />
-        </div>
-      </section>
-
-      {/* Incubator */}
-      <section className="max-w-3xl mx-auto px-5 py-12">
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 md:p-10 text-center text-white relative overflow-hidden">
-          <div className="absolute -top-16 -right-16 w-48 h-48 bg-rose-500/20 rounded-full blur-3xl" />
-          <div className="relative">
-            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-rose-300">
-              <Rocket size={15} /> {incubator.sub}
-            </span>
-            <div className="mt-5 flex justify-center">
-              <IncubatorLogo />
-            </div>
-            <h2 className="text-2xl font-bold font-serif mt-4">{incubator.name}</h2>
-            <p className="text-slate-300 text-sm mt-2 max-w-md mx-auto">
-              PITHI ត្រូវបានបណ្តុះបណ្តាល និងគាំទ្រដោយ Camboverse។
+      {/* Partners & supporters */}
+      <section className="bg-slate-50/70 border-y border-slate-100">
+        <div className="max-w-6xl mx-auto px-5 py-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900" style={{ fontFamily: "'Libre Baskerville', 'Kantumruy Pro', serif" }}>
+              ដៃគូ និងអ្នកគាំទ្រ (Partners and supporters)
+            </h2>
+            <p className="text-slate-500 mt-4 max-w-2xl mx-auto">
+              PITHI is incubated by the CamboVerse Center at the National University of Management.
             </p>
-            <a
-              href={incubator.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-6 text-sm font-bold text-white bg-rose-700 hover:bg-rose-800 px-5 py-2.5 rounded-lg transition-colors"
-            >
-              ចូលមើល Camboverse <ExternalLink size={15} />
-            </a>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {partners.map((p) => <PartnerCard key={p.logo} partner={p} />)}
           </div>
         </div>
       </section>
@@ -254,23 +247,6 @@ const AboutUs = () => {
         </div>
         <p className="text-center text-xs text-slate-400 pb-6">© 2026 PITHI Platform · Incubated by Camboverse</p>
       </footer>
-    </div>
-  );
-};
-
-const IncubatorLogo = () => {
-  const { src, onError } = useImageWithFallbacks(incubator.logo, LOGO_EXTENSIONS);
-  return src ? (
-    <img
-      key={src}
-      src={src}
-      alt={incubator.name}
-      onError={onError}
-      className="h-16 w-auto max-w-[220px] object-contain bg-white/95 rounded-xl p-2"
-    />
-  ) : (
-    <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
-      <Rocket size={28} className="text-rose-300" />
     </div>
   );
 };

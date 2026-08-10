@@ -89,44 +89,41 @@ The people who build and maintain PITHI.
 
 ---
 
-## 🤝 ដៃគូ · Our Partners
+## 🤝 ដៃគូ និងអ្នកគាំទ្រ · Partners and supporters
 
-We are grateful for the support and collaboration of our partners.
+PITHI is incubated by the CamboVerse Center at the National University of Management.
 
 <table>
   <tr>
-    <td align="center" width="50%">
+    <td align="center" width="33%">
       <a href="https://numuniversity.com/">
-        <img src="public/partners/num.png" height="100px" alt="National University of Management"/>
+        <img src="public/partners/num.png" height="90px" alt="National University of Management"/>
       </a><br /><br />
       <b>National University of Management</b><br />
-      <i>Academic partner</i><br />
-      <a href="https://numuniversity.com/">numuniversity.com</a>
+      <sub><b>សាកលវិទ្យាល័យម្ចាស់ផ្ទះ (HOST UNIVERSITY)</b></sub><br /><br />
+      <sub>PITHI is hosted at the National University of Management in Phnom Penh.</sub><br /><br />
+      🌐 <a href="https://numuniversity.com/">numuniversity.com</a>
     </td>
-    <td align="center" width="50%">
-      <a href="https://www.e-khmer.com/en">
-        <img src="public/partners/e-khmer.png" height="100px" alt="e-Khmer"/>
+    <td align="center" width="33%">
+      <a href="https://camboverse.world/">
+        <img src="public/partners/camboverse.png" height="90px" alt="CamboVerse Center"/>
       </a><br /><br />
-      <b>e-Khmer</b><br />
-      <i>Technology partner</i><br />
-      <a href="https://www.e-khmer.com/en">e-khmer.com</a>
+      <b>CamboVerse Center</b><br />
+      <sub><b>អ្នកបណ្ដុះបណ្ដាលគម្រោង (INCUBATOR)</b></sub><br /><br />
+      <sub>PITHI is incubated by the CamboVerse Center at NUM, which supports Cambodian technology projects.</sub><br /><br />
+      🌐 <a href="https://camboverse.world/">camboverse.world</a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://www.e-khmer.com/en">
+        <img src="public/partners/e-khmer.png" height="90px" alt="E-KHMER Technology Co., Ltd."/>
+      </a><br /><br />
+      <b>E-KHMER Technology Co., Ltd.</b><br />
+      <sub><b>ដៃគូបច្ចេកវិទ្យា (TECHNOLOGY PARTNER)</b></sub><br /><br />
+      <sub>E-KHMER contributes engineering and technical support to the platform.</sub><br /><br />
+      🌐 <a href="https://www.e-khmer.com/en">e-khmer.com</a>
     </td>
   </tr>
 </table>
-
----
-
-## 🚀 បណ្តុះបណ្តាលដោយ · Incubated By
-
-<div align="center">
-  <a href="https://camboverse.world/">
-    <img src="public/partners/camboverse.png" height="100px" alt="CamboVerse" />
-  </a>
-
-  **CamboVerse** - Cambodia Metaverse<br />
-  <i>PITHI is incubated and supported by CamboVerse at the National University of Management.</i><br />
-  <a href="https://camboverse.world/">camboverse.world</a>
-</div>
 
 ---
 

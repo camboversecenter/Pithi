@@ -4,7 +4,7 @@
 
 # ពិធី · PITHI - Cambodian Ceremony Management Platform
 
-PITHI ("ceremony" in Khmer) is a Progressive  planning and managing
+PITHI ("ceremony" in Khmer) is a Progressive web App for planning and managing
 traditional Cambodian ceremonies - weddings, birthdays, housewarmings, funerals,
 and memorial rites. It connects the people who host and organize events with the
 vendors who service them, in a single Khmer-language marketplace. It runs

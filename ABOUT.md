@@ -72,13 +72,34 @@ The people who build and maintain PITHI.
     <td align="center">
       <img src="public/team/member-5.jpg" width="120px" alt="Member 5"/><br />
       <b>Member 5 Name</b><br />
-      <i>UI/UX Designer</i><br />
+      <i>Frontend Developer</i><br />
       <a href="https://github.com/username">GitHub</a> · <a href="https://linkedin.com/in/username">LinkedIn</a>
     </td>
     <td align="center">
       <img src="public/team/member-6.jpg" width="120px" alt="Member 6"/><br />
       <b>Member 6 Name</b><br />
+      <i>UI/UX Designer</i><br />
+      <a href="https://github.com/username">GitHub</a> · <a href="https://linkedin.com/in/username">LinkedIn</a>
+    </td>
+  </tr>
+  <!-- ROW 3 -->
+  <tr>
+    <td align="center">
+      <img src="public/team/member-7.jpg" width="120px" alt="Member 7"/><br />
+      <b>Member 7 Name</b><br />
+      <i>QA &amp; Testing</i><br />
+      <a href="https://github.com/username">GitHub</a> · <a href="https://linkedin.com/in/username">LinkedIn</a>
+    </td>
+    <td align="center">
+      <img src="public/team/member-8.jpg" width="120px" alt="Member 8"/><br />
+      <b>Member 8 Name</b><br />
       <i>Marketing &amp; Partnerships</i><br />
+      <a href="https://github.com/username">GitHub</a> · <a href="https://linkedin.com/in/username">LinkedIn</a>
+    </td>
+    <td align="center">
+      <img src="public/team/member-9.jpg" width="120px" alt="Member 9"/><br />
+      <b>Member 9 Name</b><br />
+      <i>Content &amp; Community</i><br />
       <a href="https://github.com/username">GitHub</a> · <a href="https://linkedin.com/in/username">LinkedIn</a>
     </td>
   </tr>

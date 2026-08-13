@@ -135,6 +135,16 @@ only** and refuses to run until you replace its placeholder password.
 - `npm run preview` - preview the production build
 - `npm run deploy` - build and deploy to Cloudflare Pages
 
+## Contributing
+
+Contributions are welcome - code, documentation, translations, design, and bug
+reports alike. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, the
+migration rules, and what we look for in a pull request. All participants are
+expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Found a security issue? Please report it privately - see
+[`SECURITY.md`](SECURITY.md). Do not open a public issue.
+
 ## License
 
 PITHI is **open source** under the **Apache License 2.0** - see

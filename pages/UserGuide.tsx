@@ -3,7 +3,7 @@ import React from 'react';
 import {
   ArrowLeft, BookOpen, LogIn, Users, Calendar, Mail, Wallet, Search,
   Briefcase, MessagesSquare, Bell, MessageSquare, Sparkles, ShieldAlert,
-  Database, Scale, Send, QrCode, Smartphone, AlertTriangle,
+  Database, Scale, Send, QrCode, Smartphone, AlertTriangle, Megaphone,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/UIComponents';
@@ -67,7 +67,7 @@ const chapters = [
   { id: 'budget', no: '៦', label: 'ថវិកា & ចំណងដៃ' },
   { id: 'market', no: '៧', label: 'ទីផ្សារ & ការកក់' },
   { id: 'vendor', no: '៨', label: 'អ្នកផ្តល់សេវា' },
-  { id: 'inbox', no: '៩', label: 'សារ & ការជូនដំណឹង' },
+  { id: 'inbox', no: '៩', label: 'ការទំនាក់ទំនង' },
   { id: 'community', no: '១០', label: 'សហគមន៍' },
   { id: 'ai', no: '១១', label: 'ជំនួយការ AI' },
   { id: 'security', no: '១២', label: 'សុវត្ថិភាព' },
@@ -233,8 +233,8 @@ const UserGuide = () => {
             </ul>
           </Section>
 
-          <Section id="inbox" no="៩" title="សារ និងការជូនដំណឹង" en="Messages & notifications" icon={MessagesSquare}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Section id="inbox" no="៩" title="ការទំនាក់ទំនង" en="Messages, notifications & announcements" icon={MessagesSquare}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <p className="font-bold text-slate-800 flex items-center gap-2 mb-1.5"><MessagesSquare size={16} className="text-rose-600" /> សារផ្ទាល់</p>
                 <p className="text-sm">ជជែកផ្ទាល់រវាង ម្ចាស់កម្មវិធី ⇄ អ្នករៀបចំ ⇄ អ្នកផ្តល់សេវា។ សារថ្មីបង្ហាញភ្លាមៗ ហើយមានលេខរាប់សារមិនទាន់អាន។</p>
@@ -243,7 +243,15 @@ const UserGuide = () => {
                 <p className="font-bold text-slate-800 flex items-center gap-2 mb-1.5"><Bell size={16} className="text-rose-600" /> ការជូនដំណឹង</p>
                 <p className="text-sm">ប្រអប់ជូនដំណឹងផ្ទាល់ខ្លួន សម្រាប់ការកក់ថ្មី ការប្តូរស្ថានភាព មតិយោបល់ RSVP ការវាយតម្លៃ និងការរាយការណ៍ចំណងដៃ។</p>
               </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="font-bold text-slate-800 flex items-center gap-2 mb-1.5"><Megaphone size={16} className="text-rose-600" /> សេចក្តីជូនដំណឹង</p>
+                <p className="text-sm">ផ្ញើសារជាក្រុមតែម្តង — ដល់ <strong>ភ្ញៀវទាំងអស់</strong> នៃកម្មវិធីមួយ ឬដល់ <strong>អតិថិជនរបស់អ្នក</strong>។ ស័ក្តិសមសម្រាប់ការប្តូរម៉ោង ឬទីតាំង។</p>
+              </div>
             </div>
+            <p className="text-sm text-slate-500">
+              ផ្ទាំង <strong>"ផ្សាយសេចក្តីជូនដំណឹង"</strong> មាននៅក្នុងទំព័រគ្រប់គ្រងកម្មវិធី កម្មវិធីរបស់ខ្ញុំ និងសេវាកម្ម។
+              អ្នកទទួលនឹងឃើញវាក្នុងប្រអប់ជូនដំណឹងរបស់ពួកគេ ហើយអ្នកអាចលុបសេចក្តីជូនដំណឹងចាស់បាន។
+            </p>
           </Section>
 
           <Section id="community" no="១០" title="សហគមន៍" en="Community feed" icon={MessageSquare}>

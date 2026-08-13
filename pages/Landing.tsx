@@ -224,7 +224,7 @@ const Landing = () => {
             <Link to="/guide" className="text-slate-500 hover:text-slate-800 font-medium">សៀវភៅណែនាំ</Link>
             <Link to="/login" className="text-slate-500 hover:text-slate-800 font-medium">ចូលគណនី</Link>
             <a
-              href="https://t.me/+DBOU-zZhP_lkNTg9"
+              href="https://t.me/+7yovMjlQzw04OWI1"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-blue-500 hover:text-blue-600 font-medium"

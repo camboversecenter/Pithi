@@ -88,26 +88,26 @@ const useImageWithFallbacks = (base: string, extensions: string[]) => {
 const TeamCard = ({ member }: { member: typeof team[number] }) => {
   const { src, onError } = useImageWithFallbacks(member.photo, PHOTO_EXTENSIONS);
   return (
-    <div className="group bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-      <div className="aspect-square bg-slate-100 overflow-hidden">
+    <div className="group flex flex-col items-center text-center">
+      {/* Circular portrait. The photos are square, so the circle only masks the
+          corners - the head, which sits at the top centre, stays intact. */}
+      <div className="w-32 h-32 sm:w-36 sm:h-36 md:w-44 md:h-44 rounded-full overflow-hidden bg-slate-100 ring-4 ring-white shadow-lg shadow-slate-200/70 transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-xl">
         {src ? (
           <img
             key={src}
             src={src}
             alt={member.name}
             onError={onError}
-            className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${member.color}`}>
-            <span className="text-white text-4xl font-bold font-serif">{initialsOf(member.name)}</span>
+            <span className="text-white text-3xl md:text-4xl font-bold font-serif">{initialsOf(member.name)}</span>
           </div>
         )}
       </div>
-      <div className="p-5 text-center">
-        <h3 className="font-bold text-slate-900 text-lg">{member.name}</h3>
-        <p className="text-sm font-semibold text-rose-600 mt-0.5">{member.role}</p>
-      </div>
+      <h3 className="mt-5 font-bold text-slate-900 text-base md:text-lg leading-snug">{member.name}</h3>
+      <p className="text-sm font-semibold text-rose-600 mt-0.5">{member.role}</p>
     </div>
   );
 };
@@ -214,7 +214,7 @@ const AboutUs = () => {
           <h2 className="text-2xl md:text-3xl font-bold text-slate-900 font-serif">ក្រុមការងារ · Our Team</h2>
           <p className="text-slate-500 mt-2">មនុស្សដែលបង្កើត និងថែរក្សា PITHI។</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-5 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-10 md:gap-y-14 justify-items-center">
           {team.map((m) => <TeamCard key={m.photo} member={m} />)}
         </div>
       </section>

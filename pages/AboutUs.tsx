@@ -23,15 +23,15 @@ import {
 const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png'];
 
 const team = [
-  { name: 'Team Member 1', role: 'Founder & CEO', photo: '/team/member-1', color: 'from-rose-500 to-pink-600' },
-  { name: 'Team Member 2', role: 'Co-Founder', photo: '/team/member-2', color: 'from-blue-500 to-indigo-600' },
-  { name: 'Team Member 3', role: 'Lead Developer', photo: '/team/member-3', color: 'from-emerald-500 to-teal-600' },
-  { name: 'Team Member 4', role: 'Backend Developer', photo: '/team/member-4', color: 'from-amber-500 to-orange-600' },
-  { name: 'Team Member 5', role: 'Frontend Developer', photo: '/team/member-5', color: 'from-violet-500 to-purple-600' },
-  { name: 'Team Member 6', role: 'UI/UX Designer', photo: '/team/member-6', color: 'from-cyan-500 to-sky-600' },
-  { name: 'Team Member 7', role: 'QA & Testing', photo: '/team/member-7', color: 'from-teal-500 to-emerald-600' },
-  { name: 'Team Member 8', role: 'Marketing & Partnerships', photo: '/team/member-8', color: 'from-fuchsia-500 to-pink-600' },
-  { name: 'Team Member 9', role: 'Content & Community', photo: '/team/member-9', color: 'from-orange-500 to-amber-600' },
+  { name: 'Team Member 1', role: 'Member', photo: '/team/member-1', color: 'from-rose-500 to-pink-600' },
+  { name: 'Team Member 2', role: 'Member', photo: '/team/member-2', color: 'from-blue-500 to-indigo-600' },
+  { name: 'Team Member 3', role: 'Member', photo: '/team/member-3', color: 'from-emerald-500 to-teal-600' },
+  { name: 'Team Member 4', role: 'Member', photo: '/team/member-4', color: 'from-amber-500 to-orange-600' },
+  { name: 'Team Member 5', role: 'Member', photo: '/team/member-5', color: 'from-violet-500 to-purple-600' },
+  { name: 'Team Member 6', role: 'Member', photo: '/team/member-6', color: 'from-cyan-500 to-sky-600' },
+  { name: 'Team Member 7', role: 'Member', photo: '/team/member-7', color: 'from-teal-500 to-emerald-600' },
+  { name: 'Team Member 8', role: 'Member', photo: '/team/member-8', color: 'from-fuchsia-500 to-pink-600' },
+  { name: 'Team Member 9', role: 'Member', photo: '/team/member-9', color: 'from-orange-500 to-amber-600' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -47,8 +47,8 @@ const partners = [
     roleKm: 'សាកលវិទ្យាល័យម្ចាស់ផ្ទះ',
     roleEn: 'HOST UNIVERSITY',
     desc: 'PITHI is hosted at the National University of Management in Phnom Penh.',
-    site: 'numuniversity.com',
-    url: 'https://numuniversity.com/',
+    site: 'https://num.edu.kh/',
+    url: 'https://num.edu.kh/',
     logo: '/partners/num',
   },
   {

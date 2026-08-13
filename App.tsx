@@ -291,7 +291,9 @@ const App = () => {
   return (
     <GlobalDialogProvider>
         <NotificationProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        {/* startTransition and relativeSplatPath are the default behaviour in
+            React Router v7, so the opt-in future flags are no longer needed. */}
+        <Router>
         <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <Loader2 className="w-8 h-8 animate-spin text-rose-300" />

@@ -53,8 +53,9 @@ public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behaviour may be
-reported privately to the maintainers (see [ABOUT.md](ABOUT.md) for contact
-details). All complaints will be reviewed and investigated promptly and fairly.
+reported privately to the maintainers at
+**[pithi.deva@gmail.com](mailto:pithi.deva@gmail.com)**. All complaints will be
+reviewed and investigated promptly and fairly.
 
 Community leaders must respect the privacy and security of the reporter of any
 incident.

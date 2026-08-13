@@ -158,7 +158,7 @@ Stay up to date with our project and community.
 | 💬 **Telegram** | [Join our channel](https://t.me/+DBOU-zZhP_lkNTg9) |
 | 🚀 **Incubator** | [camboverse.world](https://camboverse.world/) |
 | 🎓 **University** | [numuniversity.com](https://num.edu.kh/) |
-| 📧 **Email** | [contact@camboverse.world](mailto:contact@camboverse.world) |
+| 📧 **Email** | [pithi.deva@gmail.com](mailto:pithi.deva@gmail.com) |
 
 ---
 

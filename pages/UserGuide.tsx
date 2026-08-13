@@ -320,6 +320,9 @@ const UserGuide = () => {
             <a href="https://t.me/+7yovMjlQzw04OWI1" target="_blank" rel="noopener noreferrer" className="px-8 py-3 bg-[#24A1DE] text-white rounded-full text-sm font-bold hover:bg-[#1f87ba] transition-all flex items-center gap-2 shadow-lg shadow-blue-100">
               <Send size={18} className="-rotate-12" /> Telegram Support Group
             </a>
+            <a href="mailto:pithi.deva@gmail.com" className="px-6 py-3 bg-slate-100 text-slate-700 rounded-full text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2">
+              <Mail size={16} /> ផ្ញើអ៊ីមែល
+            </a>
             <button onClick={() => navigate('/community')} className="px-6 py-3 bg-rose-600 text-white rounded-full text-sm font-bold hover:bg-rose-700 transition-all shadow-md shadow-rose-200">
               សួរក្នុងសហគមន៍
             </button>

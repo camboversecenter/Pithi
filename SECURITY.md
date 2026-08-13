@@ -13,8 +13,9 @@ Instead, report privately through **GitHub Security Advisories**:
 2. Choose **Report a vulnerability**.
 3. Describe the issue, the impact, and how to reproduce it.
 
-If you cannot use GitHub Security Advisories, contact a maintainer privately
-(see [ABOUT.md](ABOUT.md)) and ask for a secure channel before sending details.
+If you cannot use GitHub Security Advisories, email the maintainers privately at
+**[pithi.deva@gmail.com](mailto:pithi.deva@gmail.com)** with `SECURITY` in the
+subject line.
 
 ### What to include
 

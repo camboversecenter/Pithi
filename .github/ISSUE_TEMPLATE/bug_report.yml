@@ -1,0 +1,62 @@
+name: Bug report
+description: Report something that is not working
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Do not report security vulnerabilities here** — see
+        [SECURITY.md](../blob/main/SECURITY.md) for how to report them privately.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as an Organizer
+        2. Open "គ្រប់គ្រងកម្មវិធី"
+        3. Click ...
+        4. See the error
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Which role were you signed in as?
+      options:
+        - Event owner (GENERAL_USER)
+        - Organizer
+        - Chef
+        - Hall
+        - Music band
+        - Beauty salon
+        - Admin
+        - Not signed in
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console errors
+      description: Open developer tools (F12) → Console, and paste anything in red.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Device and browser
+      placeholder: e.g. Android 14, Chrome 130 / Windows 11, Brave
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this has not been reported
+          required: true

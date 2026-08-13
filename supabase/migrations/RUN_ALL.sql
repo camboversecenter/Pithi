@@ -1,9 +1,11 @@
 -- ====================================================================
 -- PITHI · RUN_ALL — every migration in dependency order, one paste.
 -- ====================================================================
--- ⚠️  Double-check you are connected to the intended Supabase project before
---     running: this creates tables, policies and triggers.
--- Idempotent, non-destructive, and safe even on a partially-set-up DB.
+-- Run this once in the Supabase SQL Editor to bring a PITHI database
+-- fully up to date. Idempotent, non-destructive, and safe to re-run.
+--
+-- Afterwards, claim the super administrator (optional):
+--     select public.set_super_admin_email('you@example.com');
 -- ====================================================================
 
 
@@ -26,7 +28,40 @@
 --      new user as GENERAL_USER, silently bypassing the in-app Role Selection
 --      screen. It now auto-provisions only the super administrator; everyone
 --      else picks their role in the app.
+--
+-- The super-administrator address is read from the database (see step 0), so
+-- no personal address is baked into this file. Migration 006 owns the full
+-- settings implementation; running RUN_ALL.sql applies everything in order.
 -- ====================================================================
+
+-- 0. Super-administrator address (configurable) -----------------------
+-- The super admin is stored in the database rather than hardcoded, so that
+-- every deployment (and every fork of this repository) chooses its own.
+-- Migration 006 owns the full definition; this block is repeated here so this
+-- file also works when run on its own. Set the address with:
+--     select public.set_super_admin_email('you@example.com');
+-- Leaving it unset simply disables auto-promotion.
+create table if not exists public.app_settings (
+    key text primary key,
+    value text
+);
+alter table public.app_settings enable row level security;
+revoke all on table public.app_settings from anon, authenticated;
+
+create or replace function public.super_admin_email()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select nullif(lower(trim(value)), '')
+    from public.app_settings
+    where key = 'super_admin_email';
+$$;
+
+revoke execute on function public.super_admin_email() from public, anon;
+grant execute on function public.super_admin_email() to authenticated;
 
 -- 1. Role integrity guard --------------------------------------------
 create or replace function public.enforce_user_role_integrity()
@@ -47,7 +82,9 @@ begin
 
     actor_email := auth.jwt() ->> 'email';
     select role into actor_role from public.users where id = auth.uid();
-    is_privileged := (actor_role = 'ADMIN') or (actor_email = 'pithi.deva@gmail.com');
+    is_privileged := (actor_role = 'ADMIN')
+        or (public.super_admin_email() is not null
+            and lower(trim(actor_email)) = public.super_admin_email());
 
     if tg_op = 'INSERT' then
         if new.role = 'ADMIN' and not is_privileged then
@@ -77,7 +114,8 @@ language plpgsql
 security definer
 as $$
 begin
-    if new.email = 'pithi.deva@gmail.com' then
+    if public.super_admin_email() is not null
+       and lower(trim(new.email)) = public.super_admin_email() then
         insert into public.users (id, name, email, role, "avatarUrl")
         values (
             new.id,
@@ -122,7 +160,8 @@ begin
     end if;
 
     -- The super admin is always ADMIN; nobody else may self-assign ADMIN.
-    if v_email = 'pithi.deva@gmail.com' then
+    if public.super_admin_email() is not null
+       and lower(trim(v_email)) = public.super_admin_email() then
         v_role := 'ADMIN';
     elsif v_role not in ('GENERAL_USER','ORGANIZER','CHEF','HALL','MUSIC_BAND','BEAUTY_SALON') then
         raise exception 'Invalid role %', p_role;
@@ -161,7 +200,7 @@ create policy "Enable select for everyone"
 -- update public.users
 --     set role = 'GENERAL_USER'
 --     where role = 'ADMIN'
---       and email <> 'pithi.deva@gmail.com';
+--       and email <> public.super_admin_email();
 
 
 -- ####################################################################
@@ -178,8 +217,8 @@ create policy "Enable select for everyone"
 --   * enforce_user_role_integrity() guard against ADMIN self-promotion
 --   * Row-Level Security enabled + policies on the 4 social tables
 --   * search_path pinned on the older helper functions (linter warnings)
--- No existing admin is demoted. The hardcoded super-admin address here is
--- superseded by migration 006 (appended at the end of this file).
+-- No existing admin is demoted. The super-administrator address is read from
+-- the app_settings table (see migrations 001 and 006), never hardcoded.
 -- ====================================================================
 
 -- 1. Helper: securely fetch the caller's role (used by RLS policies) --
@@ -211,7 +250,9 @@ begin
 
     actor_email := auth.jwt() ->> 'email';
     select role into actor_role from public.users where id = auth.uid();
-    is_privileged := (actor_role = 'ADMIN') or (actor_email = 'pithi.deva@gmail.com');
+    is_privileged := (actor_role = 'ADMIN')
+        or (public.super_admin_email() is not null
+            and lower(trim(actor_email)) = public.super_admin_email());
 
     if tg_op = 'INSERT' then
         if new.role = 'ADMIN' and not is_privileged then
@@ -255,7 +296,8 @@ begin
         raise exception 'Not authenticated';
     end if;
 
-    if v_email = 'pithi.deva@gmail.com' then
+    if public.super_admin_email() is not null
+       and lower(trim(v_email)) = public.super_admin_email() then
         v_role := 'ADMIN';
     elsif v_role not in ('GENERAL_USER','ORGANIZER','CHEF','HALL','MUSIC_BAND','BEAUTY_SALON') then
         raise exception 'Invalid role %', p_role;
@@ -1522,3 +1564,4 @@ begin
         raise notice 'No super admin configured. Run: select public.set_super_admin_email(''you@example.com'');';
     end if;
 end $$;
+

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel an in-progress run when the branch is pushed to again.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Type-check and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run lint
+
+      # No Supabase credentials are needed: the client falls back to a
+      # placeholder so the bundle still builds without a configured project.
+      - name: Build
+        run: npm run build
+
+  secrets:
+    name: Check for committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The anon key is public by design, but a service-role key, Gemini key or
+      # private key must never be committed. Fail loudly if one shows up.
+      - name: Scan for high-risk credentials
+        run: |
+          if grep -rInE 'AIza[0-9A-Za-z_-]{30,}|sb_secret_|service_role_key|-----BEGIN [A-Z ]*PRIVATE KEY' \
+               --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git \
+               --exclude=package-lock.json --exclude=ci.yml . ; then
+            echo "::error::A possible secret was found in the repository."
+            exit 1
+          fi
+          echo "No high-risk credentials found."
+
+      - name: Ensure no .env file is committed
+        run: |
+          if git ls-files --error-unmatch .env .env.local 2>/dev/null; then
+            echo "::error::.env files must never be committed."
+            exit 1
+          fi
+          echo "No .env files tracked."

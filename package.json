@@ -2,6 +2,24 @@
   "name": "pithi",
   "private": true,
   "version": "0.0.1",
+  "description": "A free, Khmer-language platform for planning and managing traditional Cambodian ceremonies.",
+  "homepage": "https://pithi.camboverse.world",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/camboversecenter/Pithi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/camboversecenter/Pithi/issues"
+  },
+  "keywords": [
+    "cambodia",
+    "khmer",
+    "ceremony",
+    "wedding",
+    "event-management",
+    "supabase",
+    "pwa"
+  ],
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

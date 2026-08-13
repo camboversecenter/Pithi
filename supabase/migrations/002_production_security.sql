@@ -8,8 +8,8 @@
 --   * enforce_user_role_integrity() guard against ADMIN self-promotion
 --   * Row-Level Security enabled + policies on the 4 social tables
 --   * search_path pinned on the older helper functions (linter warnings)
--- No existing admin is demoted. NOTE: migration 006 supersedes the hardcoded
--- super-admin address used here with a configurable one.
+-- No existing admin is demoted. The super-administrator address is read from
+-- the app_settings table (see migrations 001 and 006), never hardcoded.
 -- ====================================================================
 
 -- 1. Helper: securely fetch the caller's role (used by RLS policies) --
@@ -41,7 +41,9 @@ begin
 
     actor_email := auth.jwt() ->> 'email';
     select role into actor_role from public.users where id = auth.uid();
-    is_privileged := (actor_role = 'ADMIN') or (actor_email = 'pithi.deva@gmail.com');
+    is_privileged := (actor_role = 'ADMIN')
+        or (public.super_admin_email() is not null
+            and lower(trim(actor_email)) = public.super_admin_email());
 
     if tg_op = 'INSERT' then
         if new.role = 'ADMIN' and not is_privileged then
@@ -85,7 +87,8 @@ begin
         raise exception 'Not authenticated';
     end if;
 
-    if v_email = 'pithi.deva@gmail.com' then
+    if public.super_admin_email() is not null
+       and lower(trim(v_email)) = public.super_admin_email() then
         v_role := 'ADMIN';
     elsif v_role not in ('GENERAL_USER','ORGANIZER','CHEF','HALL','MUSIC_BAND','BEAUTY_SALON') then
         raise exception 'Invalid role %', p_role;

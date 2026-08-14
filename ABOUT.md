@@ -123,7 +123,7 @@ PITHI is incubated by the CamboVerse Center at the National University of Manage
       <b>National University of Management</b><br />
       <sub><b>សាកលវិទ្យាល័យម្ចាស់ផ្ទះ (HOST UNIVERSITY)</b></sub><br /><br />
       <sub>PITHI is hosted at the National University of Management in Phnom Penh.</sub><br /><br />
-      🌐 <a href="[https://num.edu.kh/">num.edu.kh</a>
+      🌐 <a href="https://num.edu.kh/">num.edu.kh</a>
     </td>
     <td align="center" width="33%">
       <a href="https://camboverse.world/">

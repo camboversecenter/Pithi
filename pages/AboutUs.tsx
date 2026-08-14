@@ -32,6 +32,9 @@ const team = [
   { name: 'Thoeunthourn Manika', role: 'Member', photo: '/team/member-7', color: 'from-teal-500 to-emerald-600' },
   { name: 'Lam Roza', role: 'Member', photo: '/team/member-8', color: 'from-fuchsia-500 to-pink-600' },
   { name: 'Rim Reaksa', role: 'Member', photo: '/team/member-9', color: 'from-orange-500 to-amber-600' },
+  { name: 'Ek Pitoumany', role: 'Member', photo: '/team/member-10', color: 'from-orange-500 to-amber-600' },
+  { name: 'Den Chaidet', role: 'Member', photo: '/team/member-11', color: 'from-orange-500 to-amber-600' },
+
 ];
 
 // ---------------------------------------------------------------------------

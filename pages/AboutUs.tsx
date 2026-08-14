@@ -47,7 +47,7 @@ const partners = [
     roleKm: 'សាកលវិទ្យាល័យម្ចាស់ផ្ទះ',
     roleEn: 'HOST UNIVERSITY',
     desc: 'PITHI is hosted at the National University of Management in Phnom Penh.',
-    site: 'https://num.edu.kh/',
+    site: 'num.edu.kh',
     url: 'https://num.edu.kh/',
     logo: '/partners/num',
   },

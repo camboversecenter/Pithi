@@ -325,7 +325,7 @@ const UserGuide = () => {
           <h3 className="text-xl font-bold text-slate-800 mb-2 font-serif">តើអ្នកមានសំណួរផ្សេងទៀត?</h3>
           <p className="text-slate-500 text-sm mb-6">ក្រុមការងារយើងខ្ញុំរីករាយនឹងជួយអ្នកជានិច្ច តាមរយៈប៉ុស្តិ៍ខាងក្រោម៖</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <a href="https://t.me/+7yovMjlQzw04OWI1" target="_blank" rel="noopener noreferrer" className="px-8 py-3 bg-[#24A1DE] text-white rounded-full text-sm font-bold hover:bg-[#1f87ba] transition-all flex items-center gap-2 shadow-lg shadow-blue-100">
+            <a href="https://t.me/pithisupport" target="_blank" rel="noopener noreferrer" className="px-8 py-3 bg-[#24A1DE] text-white rounded-full text-sm font-bold hover:bg-[#1f87ba] transition-all flex items-center gap-2 shadow-lg shadow-blue-100">
               <Send size={18} className="-rotate-12" /> Telegram Support Group
             </a>
             <a href="mailto:pithi.deva@gmail.com" className="px-6 py-3 bg-slate-100 text-slate-700 rounded-full text-sm font-bold hover:bg-slate-200 transition-all flex items-center gap-2">

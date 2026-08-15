@@ -207,7 +207,7 @@ const Login = () => {
                             <BookOpen size={12}/> សៀវភៅណែនាំ
                         </Link>
                         <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                        <a href="https://t.me/+DBOU-zZhP_lkNTg9" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-1.5">
+                        <a href="https://t.me/pithisupport" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500 transition-colors flex items-center gap-1.5">
                             <Send size={12} className="-rotate-12"/> Telegram Support
                         </a>
                     </div>

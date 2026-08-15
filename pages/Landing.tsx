@@ -115,14 +115,14 @@ const Landing = () => {
           </span>
 
           <h1 className="text-4xl md:text-6xl font-extrabold leading-tight text-slate-900" style={{ fontFamily: "'Libre Baskerville', 'Kantumruy Pro', serif" }}>
-            រៀបចំពិធីខ្មែរ<br className="hidden md:block" /> ដ៏មានន័យ ជាមួយ <span className="text-rose-700">PITHI</span>
+            បង្កើតរាល់ពិធី<br className="hidden md:block" /> ឲ្យក្លាយជាការចងចាំដ៏អស្ចារ្យ ជាមួយ <span className="text-rose-700">PITHI!</span>
           </h1>
 
           <p className="mt-6 max-w-2xl mx-auto text-base md:text-lg text-slate-600 leading-relaxed">
-            វេទិកាតែមួយសម្រាប់រៀបចំ និងគ្រប់គ្រងពិធីខ្មែរប្រពៃណី — មង្គលការ ខួបកំណើត ឡើងផ្ទះ និងបុណ្យផ្សេងៗ — ភ្ជាប់ម្ចាស់ការ អ្នករៀបចំ និងអ្នកផ្គត់ផ្គង់សេវាកម្មនៅកន្លែងតែមួយ។
+            ថ្នាលឌីជីថលតែមួយ សម្រាប់ការរៀបចំ និងគ្រប់គ្រងគ្រប់កម្មវិធីពិធី — មិនថាពិធីការតាមប្រពៃណី ឬព្រឹត្តិការណ៍ទំនើប ភ្ជាប់ទំនាក់ទំនងរវាងម្ចាស់កម្មវិធី អ្នករៀបចំ និងអ្នកផ្គត់ផ្គង់សេវាកម្មយ៉ាងងាយស្រួល។
           </p>
           <p className="mt-2 max-w-2xl mx-auto text-sm text-slate-400">
-            One Khmer-language platform to plan ceremonies and connect hosts, organizers, and vendors.
+            Your all-in-one platform to plan and manage any event — from traditional Khmer ceremonies to modern celebrations — seamlessly connecting hosts, planners, and vendors in one place.
           </p>
 
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">

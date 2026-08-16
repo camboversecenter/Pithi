@@ -20,7 +20,10 @@ import {
 // is found the card shows the member's initials, so the page never looks broken.
 // Edit the name / role fields freely.
 // ---------------------------------------------------------------------------
-const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png'];
+// WebP first: it is roughly 45% smaller than the JPEG for these portraits.
+// The browser falls through to the next extension if it cannot load one, so
+// the .jpg copies still cover anything that does not support WebP.
+const PHOTO_EXTENSIONS = ['webp', 'jpg', 'jpeg', 'png'];
 
 const team = [
   { name: 'Meun Muniroth', role: 'Member', photo: '/team/member-1', color: 'from-rose-500 to-pink-600' },
@@ -101,6 +104,10 @@ const TeamCard = ({ member }: { member: typeof team[number] }) => {
             src={src}
             alt={member.name}
             onError={onError}
+            width={400}
+            height={400}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -132,6 +139,8 @@ const PartnerCard = ({ partner }: { partner: typeof partners[number] }) => {
             src={src}
             alt={partner.name}
             onError={onError}
+            loading="lazy"
+            decoding="async"
             className="max-h-24 max-w-[200px] w-auto object-contain"
           />
         ) : (

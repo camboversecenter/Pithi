@@ -211,7 +211,7 @@ export const Logo: React.FC<LogoProps> = ({
 
   const renderTile = () => {
     return (
-      <div className="relative overflow-hidden w-full h-full rounded-lg bg-[#f0e6d2] border border-[#cfbe9d] shadow-[0_2px_8px_rgba(80,50,15,0.06)] transition-transform duration-500 hover:scale-105 flex items-center justify-center">
+      <div className="relative overflow-hidden w-full h-full rounded-lg bg-[#fce3f2] border border-[#f0c9dd] shadow-[0_2px_8px_rgba(80,50,15,0.06)] transition-transform duration-500 hover:scale-105 flex items-center justify-center">
         <img
           src="/logo.jpg"
           alt="Deva Pithi"

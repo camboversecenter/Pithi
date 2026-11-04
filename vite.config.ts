@@ -13,7 +13,12 @@ export default defineConfig(() => {
           enabled: true,
           type: 'module',
         },
-        includeAssets: ["favicon.png", "pwa-192x192.png", "pwa-512x512.png"],
+        includeAssets: [
+          "favicon.png",
+          "pwa-192x192.png",
+          "pwa-512x512.png",
+          "pwa-512x512-maskable.png",
+        ],
         manifest: {
           name: 'ពិធី - PITHI Ceremony Planner',
           short_name: 'PITHI',
@@ -26,13 +31,16 @@ export default defineConfig(() => {
           start_url: '/',
           scope: '/',
           icons: [
-            { src: "pwa-192x192.png", sizes: "192x192", type: "image/png" },
-            { src: "pwa-512x512.png", sizes: "512x512", type: "image/png" },
+            { src: "pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: "pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
             {
-              src: "pwa-512x512.png",
+              // Android crops maskable icons to a circle or squircle, so this
+              // variant keeps the envelope inside the safe zone instead of
+              // having its corners shaved off.
+              src: "pwa-512x512-maskable.png",
               sizes: "512x512",
               type: "image/png",
-              purpose: "any maskable",
+              purpose: "maskable",
             },
           ],
         },
